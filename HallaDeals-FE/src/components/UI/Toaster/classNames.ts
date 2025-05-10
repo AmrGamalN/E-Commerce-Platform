@@ -1,0 +1,6 @@
+import clx from "classnames";
+export const toasterStyles = {
+  toastContainerStyles: clx(
+    "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg text-base capitalize",
+  ),
+};
