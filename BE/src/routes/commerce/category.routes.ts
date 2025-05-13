@@ -1,7 +1,7 @@
 import express from "express";
-import { asyncHandler } from "../../middlewares/handleError";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import CategoryController from "../../controllers/commerce/category.controller";
-import { validateParamMiddleware } from "../../middlewares/validatorMiddleware";
+import { requiredParamMiddleware } from "../../middlewares/validator.middleware";
 const router = express.Router();
 const controller = CategoryController.getControllerInstance();
 
@@ -13,7 +13,7 @@ const controller = CategoryController.getControllerInstance();
  *     tags: [Category]
  *     responses:
  *       200:
- *         $ref: '#/components/responses/CategoryResponse'
+ *         $ref: '#/components/schemas/CategoryResponse'
  *       404:
  *         description: Category not found
  *       500:
@@ -31,7 +31,7 @@ router.get("/", asyncHandler(controller.getAllCategory.bind(controller)));
  *       - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/CategoryResponse'
+ *         $ref: '#/components/schemas/CategoryResponse'
  *       404:
  *         description: Category not found
  *       500:
@@ -39,7 +39,7 @@ router.get("/", asyncHandler(controller.getAllCategory.bind(controller)));
  */
 router.get(
   "/:id",
-  asyncHandler(validateParamMiddleware()),
+  requiredParamMiddleware(),
   asyncHandler(controller.getCategoryById.bind(controller))
 );
 

@@ -3,11 +3,12 @@ import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import { decrypt, encrypt } from "../utils/encryptionAES";
 import { auth } from "../config/firebase";
+import {UserRequestType} from "../types/request.type"
 dotenv.config();
 
 declare module "express-serve-static-core" {
   interface Request {
-    curUser?: any;
+    curUser?: UserRequestType;
     decode?: any;
     userId?: string;
   }
@@ -101,7 +102,7 @@ class TokenMiddleware {
           decrypt(accessToken),
           String(process.env.ACCESS_TOKEN_SECRET)
         );
-        req.curUser = decoded;
+        req.curUser = decoded as UserRequestType;
         return next();
       } catch (err) {}
     }
@@ -132,7 +133,7 @@ class TokenMiddleware {
         maxAge: 60 * 60 * 1000,
       });
 
-      req.curUser = payload;
+      req.curUser = payload as UserRequestType;
       return next();
     } catch (err) {
       return res

@@ -32,7 +32,9 @@ export const GetPaymentDto = z.object({
   orderId: z.string().optional(),
 });
 
-export const UserPaymentDto = z.array(z.string()).default([]);
+export const UserPaymentDto = z.object({
+ paymentOptions: z.array(z.string()).default([])
+});
 
 export type PaymentDtoType = z.infer<typeof PaymentDto>;
 export type PaymentUpdateDtoType = z.infer<typeof PaymentUpdateDto>;

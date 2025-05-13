@@ -30,7 +30,11 @@ export const UserSecurityAddDto = UserSecurityDto.pick({
 });
 export const UserSecurityUpdateDto = UserSecurityDto.pick({
   phoneNumber: true,
-}).partial();
+})
+  .partial()
+  .extend({
+    userId: z.string(),
+  });
 
 export type UserSecurityDtoType = z.infer<typeof UserSecurityDto>;
 export type UserSecurityAddDtoType = z.infer<typeof UserSecurityAddDto>;

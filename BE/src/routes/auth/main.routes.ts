@@ -1,18 +1,16 @@
 import { Router } from "express";
 import LoginController from "../../controllers/auth/login.controller";
-import { asyncHandler } from "../../middlewares/handleError";
-import TokenMiddleware from "../../middlewares/token.middleware";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import LoginRoutes from "./login.routes";
 import RegisterRoutes from "./register.routes";
-const tokenMiddleware = TokenMiddleware.getInstance();
-const loginController = LoginController.getInstance();
-const role = ["user", "admin", "manager"];
-const router = Router();
-router.use("/login", LoginRoutes);
-router.use("/register", RegisterRoutes);
+import { userAuthorizationMiddlewares } from "../../utils/authorizationRole.util";
 import RegisterController from "../../controllers/auth/register.controller";
 const registerController = RegisterController.getInstance();
+const loginController = LoginController.getInstance();
+const router = Router();
 
+router.use("/login", LoginRoutes);
+router.use("/register", RegisterRoutes);
 /**
  *   @swagger
  * /auth/logout:
@@ -34,8 +32,7 @@ const registerController = RegisterController.getInstance();
  */
 router.post(
   "/logout",
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
+  ...userAuthorizationMiddlewares,
   asyncHandler(loginController.logOut.bind(loginController))
 );
 

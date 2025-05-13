@@ -24,5 +24,5 @@ const categorySchema = new Schema({
   subcategories: [subcategorySchema],
 });
 
-const Category = model<CategoryDtoType>("categories", categorySchema);
+const Category = model<CategoryDtoType>("item_categories", categorySchema);
 export default Category;

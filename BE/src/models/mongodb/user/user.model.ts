@@ -18,5 +18,5 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
-const User = model<UserDtoType>("User", UserSchema);
+const User = model<UserDtoType>("user_users", UserSchema);
 export default User;

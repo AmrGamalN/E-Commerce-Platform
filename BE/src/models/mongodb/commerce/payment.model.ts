@@ -41,5 +41,5 @@ const paymentSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-const Address = model<PaymentDtoType>("payment", paymentSchema);
+const Address = model<PaymentDtoType>("item_payments", paymentSchema);
 export default Address;

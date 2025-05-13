@@ -1,21 +1,16 @@
 import express from "express";
 import DraftItemController from "../../controllers/commerce/draftItem.controller";
-import { asyncHandler } from "../../middlewares/handleError";
-import TokenMiddleware from "../../middlewares/token.middleware";
-const role = ["user", "admin", "manager"];
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import MiddlewareUploadFile from "../../middlewares/uploadFile.middleware";
 import {
-  validateParamMiddleware,
-} from "../../middlewares/validatorMiddleware";
-import { parseFieldsMiddleware, parserImagesMiddleware } from "../../middlewares/parser.middleware";
+  parseFieldsMiddleware,
+  parserImagesMiddleware,
+} from "../../middlewares/parser.middleware";
+import { userAuthorizationMiddlewares } from "../../utils/authorizationRole.util";
+import { requiredParamMiddleware } from "../../middlewares/validator.middleware";
 const middlewareUploadFile = MiddlewareUploadFile.getInstance();
-const tokenMiddleware = TokenMiddleware.getInstance();
 const controller = DraftItemController.getInstance();
 const router = express.Router();
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-];
 
 /**
  * @swagger
@@ -25,7 +20,7 @@ const commonMiddlewares = [
  *     tags: [DraftItem]
  *     responses:
  *       200:
- *         $ref: '#/components/responses/BaseResponse'
+ *         $ref: '#/components/schemas/BaseResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -35,7 +30,7 @@ const commonMiddlewares = [
  */
 router.get(
   "/count",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.countDraftItems.bind(controller))
 );
 
@@ -63,7 +58,7 @@ router.get(
  */
 router.post(
   "/add",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   middlewareUploadFile.detectS3Folder,
   middlewareUploadFile.uploadItemImages,
   parseFieldsMiddleware(),
@@ -87,7 +82,7 @@ router.post(
  *             $ref: '#/components/schemas/ItemPostDTO'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -96,9 +91,9 @@ router.post(
  *         description: Internal Server Error
  */
 router.put(
-  "/update/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/update/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   middlewareUploadFile.detectS3Folder,
   middlewareUploadFile.countImagesBeforeUpload,
   middlewareUploadFile.markUnchangedImages,
@@ -127,9 +122,9 @@ router.put(
  *         description: Internal Server Error
  */
 router.delete(
-  "/delete/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/delete/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   asyncHandler(controller.deleteDraftItem.bind(controller))
 );
 
@@ -143,7 +138,7 @@ router.delete(
  *      - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -152,9 +147,9 @@ router.delete(
  *         description: Internal Server Error
  */
 router.get(
-  "/get/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/get/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   asyncHandler(controller.getDraftItem.bind(controller))
 );
 
@@ -169,7 +164,7 @@ router.get(
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -179,7 +174,7 @@ router.get(
  */
 router.get(
   "/",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.getAllDraftItem.bind(controller))
 );
 

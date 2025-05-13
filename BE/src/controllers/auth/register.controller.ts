@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import RegisterService from "../../services/auth/register.service";
 import FacebookService from "../../services/auth/facebook.service";
 import GoogleService from "../../services/auth/google.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 class RegisterController {
   private static instance: RegisterController;

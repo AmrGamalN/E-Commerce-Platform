@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import AddressService from "../../services/user/address.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 class AddressController {
   private static Instance: AddressController;
@@ -19,19 +19,21 @@ class AddressController {
   async addAddress(req: Request, res: Response): Promise<Response> {
     const retrievedAddress = await this.serviceInstance.addAddress(
       req.body,
-      req.curUser.userId
+      req.curUser?.userId
     );
     return controllerResponse(res, retrievedAddress);
   }
 
   async getAddress(req: Request, res: Response): Promise<Response> {
-    const retrievedAddress = await this.serviceInstance.getAddress(req.body.id);
+    const retrievedAddress = await this.serviceInstance.getAddress(
+      req.params.id
+    );
     return controllerResponse(res, retrievedAddress);
   }
 
   async getAllAddress(req: Request, res: Response): Promise<Response> {
     const retrievedAddress = await this.serviceInstance.getAllAddress(
-      req.curUser.userId
+      req.curUser?.userId
     );
     return controllerResponse(res, retrievedAddress);
   }
@@ -39,7 +41,7 @@ class AddressController {
   async updateAddress(req: Request, res: Response): Promise<Response> {
     const retrievedAddress = await this.serviceInstance.updateAddress(
       req.body,
-      req.body.id
+      req.params.id
     );
     return controllerResponse(res, retrievedAddress);
   }
@@ -50,8 +52,9 @@ class AddressController {
   }
 
   async deleteAddress(req: Request, res: Response): Promise<Response> {
-    const id = req.body.id;
-    const retrievedAddress = await this.serviceInstance.deleteAddress(id);
+    const retrievedAddress = await this.serviceInstance.deleteAddress(
+      req.params.id
+    );
     return controllerResponse(res, retrievedAddress);
   }
 }

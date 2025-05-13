@@ -4,13 +4,14 @@ import {
   authentication,
   signInWithEmailAndPassword,
 } from "../../config/firebase";
-import { warpAsync } from "../../utils/warpAsync";
+import { warpAsync } from "../../utils/warpAsync.util";
 import dotenv from "dotenv";
 import { UserSecurityDtoType } from "../../dto/user/security.dto";
 import TokenService from "../../services/auth/token.service";
 import speakeasy from "speakeasy";
 import bcrypt from "bcrypt";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
 dotenv.config();
 
 class LoginService {
@@ -31,7 +32,7 @@ class LoginService {
       password: string,
       email?: string,
       phoneNumber?: string
-    ): Promise<responseHandler> => {
+    ): Promise<ServiceResponseType> => {
       const credential = email
         ? { email: email }
         : { phoneNumber: phoneNumber };
@@ -104,7 +105,7 @@ class LoginService {
       userId: string,
       status: string,
       sign_in_provider: string
-    ): Promise<responseHandler> => {
+    ): Promise<ServiceResponseType> => {
       await Security.updateOne(
         {
           userId,
@@ -116,12 +117,12 @@ class LoginService {
           },
         }
       ).lean();
-      return {success:true};
+      return { success: true };
     }
   );
 
   private isUserExisting = warpAsync(
-    async (credential: any): Promise<responseHandler> => {
+    async (credential: any): Promise<ServiceResponseType> => {
       let getUser;
       let provider;
       if (credential.email) {
@@ -144,7 +145,7 @@ class LoginService {
   );
 
   private signWithPasswordAndEmail = warpAsync(
-    async (email: string, password: string): Promise<responseHandler> => {
+    async (email: string, password: string): Promise<ServiceResponseType> => {
       let userCredential;
       try {
         userCredential = await signInWithEmailAndPassword(
@@ -166,7 +167,7 @@ class LoginService {
           });
         }
       }
-            return { success: true,data:userCredential };
+      return { success: true, data: userCredential };
     }
   );
 
@@ -175,7 +176,7 @@ class LoginService {
       plainPassword: string,
       hashPassword: string,
       phoneNumber: string
-    ): Promise<responseHandler> => {
+    ): Promise<ServiceResponseType> => {
       const comparePass = await bcrypt.compare(plainPassword, hashPassword);
       if (!comparePass) {
         this.trackFailedLoginAttempt(null, phoneNumber);
@@ -188,12 +189,12 @@ class LoginService {
         { phoneNumber },
         { $set: { numberLogin: 0, lastFailedLoginTime: null } }
       );
-        return { success: true };
+      return { success: true };
     }
   );
 
   private checkAccountStatusBeforeLogin = warpAsync(
-    async (userSecurity: UserSecurityDtoType): Promise<responseHandler> => {
+    async (userSecurity: UserSecurityDtoType): Promise<ServiceResponseType> => {
       const statusMessage =
         (userSecurity.isAccountDeleted && "Account is deleted") ||
         (userSecurity.isAccountBlocked && "Account is blocked") ||
@@ -211,7 +212,7 @@ class LoginService {
     async (
       userSecurity: UserSecurityDtoType,
       credential: { email: string } | { phoneNumber: string }
-    ): Promise<responseHandler> => {
+    ): Promise<ServiceResponseType> => {
       if (Number(userSecurity.numberLogin) >= 4) {
         const currentTime = Date.now();
         const lastFailedTime = new Date(
@@ -231,23 +232,26 @@ class LoginService {
           $set: { numberLogin: 0, lastFailedLoginTime: null },
         });
       }
-           return { success: true };
+      return { success: true };
     }
   );
 
   private trackFailedLoginAttempt = warpAsync(
-    async (email?: string, phoneNumber?: string): Promise<responseHandler> => {
+    async (
+      email?: string,
+      phoneNumber?: string
+    ): Promise<ServiceResponseType> => {
       const query = email ? { email: email } : { phoneNumber: phoneNumber };
       await Security.updateOne(query, {
         $inc: { numberLogin: 1 },
         $set: { lastFailedLoginTime: new Date().toISOString() },
       });
-      return {success:true}
+      return { success: true };
     }
   );
 
   private checkApplyTwoFactorAuth = warpAsync(
-    async (userSecurity: UserSecurityDtoType): Promise<responseHandler> => {
+    async (userSecurity: UserSecurityDtoType): Promise<ServiceResponseType> => {
       if (userSecurity.isTwoFactorAuth)
         return serviceResponse({
           statusText: "OK",
@@ -258,7 +262,10 @@ class LoginService {
   );
 
   verifyTwoFactorAuthentication = warpAsync(
-    async (curUser: any, twoFactorCode: string): Promise<responseHandler> => {
+    async (
+      curUser: any,
+      twoFactorCode: string
+    ): Promise<ServiceResponseType> => {
       const credential = curUser.email
         ? { email: curUser.email }
         : { phoneNumber: curUser.phoneNumber };

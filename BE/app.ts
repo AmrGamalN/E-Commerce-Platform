@@ -1,20 +1,17 @@
-import express, { Application } from "express";
+import express, { Application, NextFunction, Request, Response } from "express";
 import dotenv from "dotenv";
 import connectToMongoDB from "./src/config/mongoDBConnect";
 import router from "./src/router";
-import swaggerJsdoc from "swagger-jsdoc";
-import swaggerUi from "swagger-ui-express";
-import swaggerOptions from "./src/config/swaggerConfig";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { redisClient } from "./src/config/redisConfig";
-import { errorMiddleware } from "./src/middlewares/handleError";
+import { errorMiddleware } from "./src/middlewares/handleError.middleware";
 import helmet from "helmet";
+import { swaggerSpec } from "./src/config/swaggerConfig";
 const xssClean = require("xss-clean");
 dotenv.config();
 
-const swaggerDocs = swaggerJsdoc(swaggerOptions);
 const app: Application = express();
 
 const corsOptions = {
@@ -22,8 +19,10 @@ const corsOptions = {
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:3002",
-    "https://halla-deals-1dytz4glq-halla-deals-projects.vercel.app",
-    "http://16.24.17.47",
+    "https://e-commerce-platform-woad.vercel.app",
+    "https://e-commerce-platform-git-main-amr-gamals-projects-5f0c02d5.vercel.app",
+    "https://e-commerce-platform-5jiucuv86-amr-gamals-projects-5f0c02d5.vercel.app",
+    String(process.env.FRONTEND_URL),
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -36,15 +35,16 @@ app.use(bodyParser.json());
 app.use(helmet());
 app.use(xssClean());
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+swaggerSpec(app);
 app.use("/api", router);
 
-// Error handle middleware
-app.use(errorMiddleware);
-
+const PORT = process.env.PORT || 8080;
 Promise.all([connectToMongoDB(), redisClient.connect()])
-  .then(() => {
-    const PORT = process.env.PORT || 8080;
+  .then(async () => {
+    app.use("*", (req: Request, res: Response, next: NextFunction) => {
+      res.status(404).json({ message: "Page not found" });
+    });
+    app.use(errorMiddleware);
     app.listen(PORT, () => {
       console.log(`Express server started on port ${PORT}`);
     });

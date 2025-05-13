@@ -4,27 +4,20 @@ import {
   parseFieldsMiddleware,
   parserImagesMiddleware,
 } from "../../middlewares/parser.middleware";
-import { asyncHandler } from "../../middlewares/handleError";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import {
   expressValidator,
-  validateParamMiddleware,
-} from "../../middlewares/validatorMiddleware";
-import TokenMiddleware from "../../middlewares/token.middleware";
+  requiredParamMiddleware,
+} from "../../middlewares/validator.middleware";
 import MiddlewareUploadFile from "../../middlewares/uploadFile.middleware";
 import {
   validateItemAdd,
   validateItemUpdate,
 } from "../../validation/commerce/item.validator";
-const role = ["user", "admin", "manager"];
-const tokenMiddleware = TokenMiddleware.getInstance();
+import { userAuthorizationMiddlewares } from "../../utils/authorizationRole.util";
 const middlewareUploadFile = MiddlewareUploadFile.getInstance();
 const controller = ItemController.getControllerInstance();
 const router = express.Router();
-
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-];
 
 /**
  * @swagger
@@ -32,32 +25,8 @@ const commonMiddlewares = [
  *   get:
  *     summary: Get count of items
  *     tags: [Item]
- *     responses:
- *       200:
- *         $ref: '#/components/responses/ItemResponse'
- *       403:
- *         description: Unauthorized
- *       404:
- *         description: Item not found
- *       500:
- *         description: Internal Server Error
- */
-router.get(
-  "/count",
-  ...commonMiddlewares,
-  asyncHandler(controller.countItems.bind(controller))
-);
-
-/**
- * @swagger
- * /item/filter:
- *   get:
- *     summary: Get items with multiple filters
- *     tags: [Item]
  *     parameters:
- *       - $ref: '#/components/parameters/PageParam'
- *       - $ref: '#/components/parameters/LimitParam'
- *       - $ref: '#/components/parameters/ItemParam'
+ *       - $ref: '#/components/parameters/CategoryParam'
  *       - $ref: '#/components/parameters/SubItemParam'
  *       - $ref: '#/components/parameters/BrandParam'
  *       - $ref: '#/components/parameters/TypeParam'
@@ -76,13 +45,19 @@ router.get(
  *       - $ref: '#/components/parameters/AvgRatingParam'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
+ *       403:
+ *         description: Unauthorized
  *       404:
  *         description: Item not found
  *       500:
  *         description: Internal Server Error
  */
-router.get("/filter", asyncHandler(controller.filterItem.bind(controller)));
+router.get(
+  "/count",
+  ...userAuthorizationMiddlewares,
+  asyncHandler(controller.countItems.bind(controller))
+);
 
 /**
  * @swagger
@@ -93,9 +68,28 @@ router.get("/filter", asyncHandler(controller.filterItem.bind(controller)));
  *     parameters:
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/LimitParam'
+ *       - $ref: '#/components/parameters/CategoryParam'
+ *       - $ref: '#/components/parameters/SubItemParam'
+ *       - $ref: '#/components/parameters/BrandParam'
+ *       - $ref: '#/components/parameters/TypeParam'
+ *       - $ref: '#/components/parameters/DiscountParam'
+ *       - $ref: '#/components/parameters/SizeParam'
+ *       - $ref: '#/components/parameters/MaterialParam'
+ *       - $ref: '#/components/parameters/ColorParam'
+ *       - $ref: '#/components/parameters/LocationParam'
+ *       - $ref: '#/components/parameters/ConditionParam'
+ *       - $ref: '#/components/parameters/AllowNegotiateParam'
+ *       - $ref: '#/components/parameters/PriceMinParam'
+ *       - $ref: '#/components/parameters/PriceMaxParam'
+ *       - $ref: '#/components/parameters/CreatedFromParam'
+ *       - $ref: '#/components/parameters/CreatedToParam'
+ *       - $ref: '#/components/parameters/CommunicationsParam'
+ *       - $ref: '#/components/parameters/AvgRatingParam'
+ *       - $ref: '#/components/parameters/ItemSortPrice'
+ *       - $ref: '#/components/parameters/ItemSortCreatedAt'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       404:
  *         description: Item not found
  *       500:
@@ -113,7 +107,7 @@ router.get("/", asyncHandler(controller.getAllItem.bind(controller)));
  *       - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       404:
  *         description: Item not found
  *       500:
@@ -121,7 +115,7 @@ router.get("/", asyncHandler(controller.getAllItem.bind(controller)));
  */
 router.get(
   "/:id",
-  asyncHandler(validateParamMiddleware()),
+  requiredParamMiddleware(),
   asyncHandler(controller.getItem.bind(controller))
 );
 
@@ -135,7 +129,7 @@ router.get(
  *       - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       404:
  *         description: Item not found
  *       500:
@@ -143,7 +137,7 @@ router.get(
  */
 router.get(
   "/category/:id",
-  asyncHandler(validateParamMiddleware()),
+  requiredParamMiddleware(),
   asyncHandler(controller.getItemByCategoryId.bind(controller))
 );
 
@@ -157,7 +151,7 @@ router.get(
  *       - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       404:
  *         description: Item not found
  *       500:
@@ -165,7 +159,7 @@ router.get(
  */
 router.get(
   "/sub-category/:id",
-  asyncHandler(validateParamMiddleware()),
+  requiredParamMiddleware(),
   asyncHandler(controller.getItemBySubCategoryId.bind(controller))
 );
 
@@ -193,12 +187,12 @@ router.get(
  */
 router.post(
   "/add",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   middlewareUploadFile.detectS3Folder,
   middlewareUploadFile.uploadItemImages,
   parseFieldsMiddleware(),
   parserImagesMiddleware(),
-  asyncHandler(expressValidator(validateItemAdd)),
+  expressValidator(validateItemAdd),
   asyncHandler(controller.addItem.bind(controller))
 );
 
@@ -221,9 +215,9 @@ router.post(
  *         description: Internal Server Error
  */
 router.delete(
-  "/delete/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/delete/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   asyncHandler(controller.deleteItem.bind(controller))
 );
 
@@ -257,7 +251,7 @@ router.delete(
  *             $ref: '#/components/schemas/ItemPostDTO'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ItemResponse'
+ *         $ref: '#/components/schemas/ItemResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -266,16 +260,16 @@ router.delete(
  *         description: Internal Server Error
  */
 router.put(
-  "/update/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/update/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   middlewareUploadFile.detectS3Folder,
   middlewareUploadFile.countImagesBeforeUpload,
   middlewareUploadFile.markUnchangedImages,
   middlewareUploadFile.uploadItemImages,
   parseFieldsMiddleware(),
   parserImagesMiddleware(),
-  asyncHandler(expressValidator(validateItemUpdate)),
+  expressValidator(validateItemUpdate),
   asyncHandler(controller.updateItem.bind(controller))
 );
 
@@ -312,9 +306,9 @@ router.put(
  *         description: Internal Server Error
  */
 router.delete(
-  "/image/delete/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/image/delete/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   middlewareUploadFile.deleteItemImage,
   asyncHandler(controller.deleteImages.bind(controller))
 );

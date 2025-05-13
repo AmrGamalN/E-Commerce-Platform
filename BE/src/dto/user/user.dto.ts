@@ -22,7 +22,11 @@ export const UserUpdateDto = UserDto.pick({
   firstName: true,
   lastName: true,
   gender: true,
-}).partial();
+})
+  .partial()
+  .extend({
+    userId: z.string(),
+  });
 
 export type UserDtoType = z.infer<typeof UserDto>;
 export type UserAddDtoType = z.infer<typeof UserAddDto>;

@@ -1,9 +1,7 @@
 import Security from "../../models/mongodb/user/security.model";
-import { warpAsync } from "../../utils/warpAsync";
-import {
-serviceResponse,
-  responseHandler,
-} from "../../utils/responseHandler";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
 import dotenv from "dotenv";
 import TokenService from "../../services/auth/token.service";
 import User from "../../models/mongodb/user/user.model";
@@ -23,32 +21,35 @@ class GoogleService {
     return GoogleService.instanceService;
   }
 
-  registerByGoogle = warpAsync(async (user: any): Promise<responseHandler> => {
-    await this.handleGoogle(user);
-          return serviceResponse({
+  registerByGoogle = warpAsync(
+    async (user: any): Promise<ServiceResponseType> => {
+      await this.handleGoogle(user);
+      return serviceResponse({
         statusText: "Created",
       });
-  });
+    }
+  );
 
-  loginByGoogle = warpAsync(async (user: any): Promise<responseHandler> => {
+  loginByGoogle = warpAsync(async (user: any): Promise<ServiceResponseType> => {
     await this.handleGoogle(user);
     const userSecurity = await Security.findOne({ email: user.email })
       .select("email")
       .lean();
-    if (!userSecurity)return serviceResponse({
-      statusText: "NotFound",
-      message: "Account not found",
-    });
-    const tokens = await this.tokenService.generateTokens(userSecurity);
+    if (!userSecurity)
       return serviceResponse({
-        statusText: "OK",
-        message: "Login successful",
-        data: {
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          userId: userSecurity.userId,
-        },
+        statusText: "NotFound",
+        message: "Account not found",
       });
+    const tokens = await this.tokenService.generateTokens(userSecurity);
+    return serviceResponse({
+      statusText: "OK",
+      message: "Login successful",
+      data: {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        userId: userSecurity.userId,
+      },
+    });
   });
 
   private handleGoogle = async (user: any): Promise<void> => {

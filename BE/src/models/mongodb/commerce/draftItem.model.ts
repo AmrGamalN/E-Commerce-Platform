@@ -19,6 +19,12 @@ const ItemCategorySchema = {
   subcategory: { type: String, optional: true, trim: true, default: "" },
   brand: { type: String, optional: true, trim: true, default: "" },
   type: { type: String, optional: true, default: "" },
+  path: [
+    {
+      id: { type: String, optional: true, default: "" },
+      label: { type: String, optional: true, default: "" },
+    },
+  ],
 };
 
 const ItemDetailsSchema = {
@@ -61,10 +67,6 @@ const ItemDetailsSchema = {
   allowNegotiate: { type: Boolean, default: false },
   isFirstItem: { type: Boolean, default: false },
   promotion: { type: Boolean, default: false },
-  reviewId: {
-    type: [String],
-    default: [],
-  },
   rate: {
     avgRating: {
       type: Number,
@@ -105,5 +107,5 @@ export const ItemDraftSchema = new Schema(
   { timestamps: true }
 );
 
-const DraftItem = model<ItemDraftDtoType>("draftItems", ItemDraftSchema);
+const DraftItem = model<ItemDraftDtoType>("item_draftItems", ItemDraftSchema);
 export default DraftItem;

@@ -6,9 +6,10 @@ import {
   AddressAddDtoType,
   AddressUpdateDtoType,
 } from "../../dto/user/address.dto";
-import { warpAsync } from "../../utils/warpAsync";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
 
 class AddressService {
   private static Instance: AddressService;
@@ -24,60 +25,72 @@ class AddressService {
     async (
       data: AddressAddDtoType,
       userId: string
-    ): Promise<responseHandler> => {
-      const parsed = validateAndFormatData(data, AddressAddDto);
-      await Address.create({ ...parsed.data, userId: userId });
+    ): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: AddressAddDto,
+      });
+      await Address.create({ ...validationResult.data, userId: userId });
       return serviceResponse({
         statusText: "Created",
       });
     }
   );
 
-  getAddress = warpAsync(async (query: object): Promise<responseHandler> => {
-    const retrievedAddress = await Address.findOne(query);
-    return validateAndFormatData(retrievedAddress, AddressDto);
+  getAddress = warpAsync(async (_id: object): Promise<ServiceResponseType> => {
+    return validateAndFormatData({
+      data: await Address.findById({ _id }),
+      userDto: AddressDto,
+    });
   });
 
   getAllAddress = warpAsync(
-    async (userId: string): Promise<responseHandler> => {
-      const retrievedAddress = await Address.find({ userId });
-      return validateAndFormatData(retrievedAddress, AddressDto, "getAll");
+    async (userId: string): Promise<ServiceResponseType> => {
+      return validateAndFormatData({
+        data: await Address.find({ userId }),
+        userDto: AddressDto,
+        actionType: "getAll",
+      });
     }
   );
 
   updateAddress = warpAsync(
     async (
       data: AddressUpdateDtoType,
-      query: object
-    ): Promise<responseHandler> => {
-      const parsed = validateAndFormatData(data, AddressUpdateDto, "update");
-      if (!parsed.success) return parsed;
+      _id: string
+    ): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: AddressUpdateDto,
+        actionType: "update",
+      });
+      if (!validationResult.success) return validationResult;
 
-      const updatedAddress = await Address.findOneAndUpdate(
-        query,
+      const updatedAddress = await Address.updateOne(
+        { _id },
         {
-          $set: parsed.data,
-        },
-        { new: true, runValidators: true }
-      ).lean();
-
+          $set: validationResult.data,
+        }
+      );
       return serviceResponse({
-        data: updatedAddress,
+        updatedCount: updatedAddress.modifiedCount,
       });
     }
   );
 
-  countAddress = warpAsync(async (): Promise<responseHandler> => {
+  countAddress = warpAsync(async (): Promise<ServiceResponseType> => {
     return serviceResponse({
       count: await Address.countDocuments(),
     });
   });
 
-  deleteAddress = warpAsync(async (query: object): Promise<responseHandler> => {
-    return serviceResponse({
-      deleteCount: (await Address.deleteOne(query)).deletedCount,
-    });
-  });
+  deleteAddress = warpAsync(
+    async (_id: object): Promise<ServiceResponseType> => {
+      return serviceResponse({
+        deletedCount: (await Address.deleteOne({ _id })).deletedCount,
+      });
+    }
+  );
 }
 
 export default AddressService;

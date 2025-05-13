@@ -6,12 +6,19 @@ import {
   ItemUpdateDtoType,
   ItemUpdateDto,
 } from "../../dto/commerce/item.dto";
-import { warpAsync } from "../../utils/warpAsync";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
-import { Pagination } from "../../utils/pagination";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
+import { generatePagination } from "../../utils/generatePagination.util";
 import Address from "../../models/mongodb/user/address.model";
 import { v4 as uuidv4 } from "uuid";
+import { ItemFiltersType, ItemSortType } from "../../types/filter.type";
+import {
+  generateFilters,
+  generateSort,
+} from "../../utils/generateFilter&Sort.util";
+import { UserRequestType } from "../../types/request.type";
 
 class ItemService {
   private static Instance: ItemService;
@@ -24,16 +31,21 @@ class ItemService {
   }
 
   addItem = warpAsync(
-    async (data: ItemAddDtoType, curUser: any): Promise<responseHandler> => {
-      const parsed = validateAndFormatData(data, ItemAddDto);
-      const prefixS3 = uuidv4();
+    async (
+      data: ItemAddDtoType,
+      curUser: UserRequestType
+    ): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: ItemAddDto,
+      });
       await Item.create({
-        ...parsed.data,
+        ...validationResult.data,
         userId: curUser.userId,
         userName: curUser.name,
         userImage: curUser.profileImage?.imageUrl,
-        phone: curUser?.phone,
-        prefixS3,
+        phone: curUser?.phoneNumber,
+        prefixS3: uuidv4(),
       });
       return serviceResponse({
         statusText: "Created",
@@ -41,54 +53,68 @@ class ItemService {
     }
   );
 
-  getItem = warpAsync(async (query: object): Promise<responseHandler> => {
-    const retrievedItem = await Item.findOne(query).lean();
-    const item = validateAndFormatData(retrievedItem, ItemDto);
-    let itemData =item.data;
-    const address = await Address.findOne({
+  getItem = warpAsync(async (_id: string): Promise<ServiceResponseType> => {
+    const item = validateAndFormatData({
+      data: await Item.findById({ _id }).lean(),
+      userDto: ItemDto,
+    });
+    const address = await Address.findById({
       _id: item?.data?.location,
     }).lean();
 
-    if (address) {
-      itemData = {
-        location: address,
-      };
-    }
-
+    if (address) item.data.location = address;
     return serviceResponse({
       statusText: "OK",
-      data: itemData,
+      data: item,
     });
   });
 
   getAllItem = warpAsync(
-    async (args: { page: number; limit: number }): Promise<responseHandler> => {
-      const count = await this.countItems();
-      return Pagination(Item, ItemDto, count.count ?? 0, args);
+    async (
+      queries: ItemFiltersType,
+      sort: ItemSortType
+    ): Promise<ServiceResponseType> => {
+      return await this.filterItem(queries, sort);
+    }
+  );
+
+  countItems = warpAsync(
+    async (
+      queries: ItemSortType,
+      filtered?: boolean
+    ): Promise<ServiceResponseType> => {
+      const filters = filtered
+        ? queries
+        : generateFilters<ItemSortType>(queries);
+      return serviceResponse({
+        count: await Item.countDocuments(filters),
+      });
     }
   );
 
   getItemByCategoryId = warpAsync(
-    async (categoryId: String): Promise<responseHandler> => {
-      const filter = { categoryId: categoryId };
-      return await this.fetchItemsWithFilters(filter);
+    async (categoryId: String): Promise<ServiceResponseType> => {
+      return await this.filterItem({ categoryId });
     }
   );
 
   getItemBySubCategoryId = warpAsync(
-    async (SubCategoryId: String): Promise<responseHandler> => {
-      const filter = { subCategoryId: SubCategoryId };
-      return await this.fetchItemsWithFilters(filter);
+    async (SubCategoryId: String): Promise<ServiceResponseType> => {
+      return await this.filterItem({ SubCategoryId });
     }
   );
 
   updateItem = warpAsync(
     async (
       data: ItemUpdateDtoType,
-      query: object
-    ): Promise<responseHandler> => {
-      const parsed = validateAndFormatData(data, ItemUpdateDto, "update");
-      if (!parsed.success) return parsed;
+      _id: object
+    ): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: ItemUpdateDto,
+        actionType: "update",
+      });
+      if (!validationResult.success) return validationResult;
 
       let angles: number[] = [];
       let keys: string[] = [];
@@ -97,29 +123,28 @@ class ItemService {
         keysImageUnchanged = [],
         itemImages = [],
         ...itemData
-      } = parsed.data;
+      } = validationResult.data;
 
-      let updatedItem;
+      let updatedItem: any;
       if (itemData || keysImageUnchanged > 0) {
         keysImageUnchanged?.map((image: any) => {
           keys.push(image.key);
           angles.push(image.angle);
         });
         [updatedItem] = await Promise.all([
-          Item.findOneAndUpdate(
-            query,
+          Item.updateOne(
+            { _id },
             {
               $set: {
                 ...itemData,
               },
-            },
-            { new: true }
+            }
           ),
           Item.bulkWrite(
             keys.map((key, index) => ({
               updateOne: {
                 filter: {
-                  query,
+                  _id,
                   "itemImages.key": key,
                 },
                 update: {
@@ -141,12 +166,10 @@ class ItemService {
             },
           },
         };
-        updatedItem = await Item.findOneAndUpdate(query, newImage, {
-          new: true,
-        });
+        updatedItem = await Item.updateOne({ _id }, newImage);
       }
       return serviceResponse({
-        data: updatedItem,
+        updatedCount: updatedItem.modifiedCount,
       });
     }
   );
@@ -154,16 +177,19 @@ class ItemService {
   deleteImages = warpAsync(
     async (
       deleteImageKeys: string[],
-      query: object
-    ): Promise<responseHandler> => {
+      _id: object
+    ): Promise<ServiceResponseType> => {
       if (deleteImageKeys?.length > 0) {
-        await Item.updateOne(query, {
-          $pull: {
-            itemImages: {
-              key: { $in: deleteImageKeys },
+        await Item.updateOne(
+          { _id },
+          {
+            $pull: {
+              itemImages: {
+                key: { $in: deleteImageKeys },
+              },
             },
-          },
-        });
+          }
+        );
       }
       return serviceResponse({
         statusText: "OK",
@@ -172,102 +198,32 @@ class ItemService {
     }
   );
 
-  countItems = warpAsync(async (): Promise<responseHandler> => {
-    return serviceResponse({
-      count: await Item.countDocuments(),
-    });
-  });
-
-  deleteItem = warpAsync(async (query: object): Promise<responseHandler> => {
-    return serviceResponse({
-      deleteCount: (await Item.deleteOne(query)).deletedCount,
-    });
-  });
-
-  private fetchItemsWithFilters = warpAsync(
+  private filterItem = warpAsync(
     async (
-      filter: Record<string, unknown>,
-      args: { page: number; limit: number }
-    ): Promise<responseHandler> => {
-      const count = await this.countItems();
-      return Pagination(
-        Item,
-        ItemDto,
-        Number(count.count),
-        args,
-        filter,
-        "filter"
-      );
+      queries: ItemFiltersType,
+      sort: ItemSortType
+    ): Promise<ServiceResponseType> => {
+      const filters = generateFilters<ItemFiltersType>(queries, "item");
+      const count = await this.countItems(filters, true);
+      return await generatePagination({
+        model: Item,
+        userDto: ItemDto,
+        totalCount: count.count,
+        paginationOptions: {
+          sort: generateSort<ItemSortType>(sort),
+          page: queries.page,
+          limit: queries.limit,
+        },
+        fieldSearch: filters,
+      });
     }
   );
 
-  filterItem = warpAsync(
-    async (filters: Record<string, any>): Promise<responseHandler> => {
-      const query: Record<string, any> = {};
-      const ratingIndexMap: Record<string, number> = {
-        bad: 0,
-        average: 1,
-        good: 2,
-        very_good: 3,
-        excellent: 4,
-      };
-
-      if (filters.avgRating) {
-        query["rate.avgRating"] = { $gte: filters.avgRating };
-      }
-
-      if (filters.title && ratingIndexMap[filters.title] !== undefined) {
-        const index = ratingIndexMap[filters.title];
-        query[`rate.rating.${index}`] = { $gte: 1 };
-      }
-
-      if (filters.communications?.length) {
-        query["communications"] = { $in: filters.communications };
-      }
-
-      if (filters.color?.length) {
-        query["color"] = { $in: filters.color };
-      }
-
-      if (filters.min && filters.max) {
-        query["price"] = {
-          $gte: Number(filters.min),
-          $lte: Number(filters.max),
-        };
-      }
-
-      if (filters.from && filters.to) {
-        query["createdAt"] = {
-          $gte: new Date(filters.from),
-          $lte: new Date(filters.to),
-        };
-      }
-      if (filters.discount)
-        query["isDiscount"] = filters.discount == "true" ? true : false;
-
-      if (filters.allowNegotiate)
-        query["allowNegotiate"] =
-          filters.allowNegotiate == "true" ? true : false;
-
-      const stringFilters: (keyof typeof filters)[] = [
-        "category",
-        "subcategory",
-        "brand",
-        "type",
-        "condition",
-        "location",
-        "size",
-        "material",
-      ];
-
-      for (const key of stringFilters) {
-        if (filters[key]) {
-          query[key] = filters[key];
-        }
-      }
-      return await this.fetchItemsWithFilters(query, filters);
-    }
-  );
+  deleteItem = warpAsync(async (_id: string): Promise<ServiceResponseType> => {
+    return serviceResponse({
+      deletedCount: (await Item.deleteOne({ _id })).deletedCount,
+    });
+  });
 }
 
 export default ItemService;

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import ProfileService from "../../services/user/profile.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 class ProfileController {
   private static instance: ProfileController;
@@ -16,7 +16,7 @@ class ProfileController {
   }
 
   async getProfile(req: Request, res: Response): Promise<Response> {
-    const result = await this.profileService.getProfile(req.body.id);
+    const result = await this.profileService.getProfile(req.params.userId);
     return controllerResponse(res, result);
   }
 
@@ -31,10 +31,7 @@ class ProfileController {
   }
 
   async updateProfile(req: Request, res: Response): Promise<Response> {
-    const result = await this.profileService.updateProfile(
-      req.body,
-      req.body.id
-    );
+    const result = await this.profileService.updateProfile(req.body);
     return controllerResponse(res, result);
   }
 }

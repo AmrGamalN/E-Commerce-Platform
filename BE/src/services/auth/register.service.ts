@@ -3,13 +3,14 @@ import Otp from "../../models/mongodb/user/otp.model";
 import Profile from "../../models/mongodb/user/profile.model";
 import Security from "../../models/mongodb/user/security.model";
 import { RegisterDtoType, RegisterDto } from "../../dto/auth/register.dto";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
 import { auth } from "../../config/firebase";
 import { redisClient } from "../../config/redisConfig";
-import { sendEmail, sendVerificationEmail } from "../../utils/sendEmail";
-import { generateVerificationToken } from "../../utils/generateCode";
-import { warpAsync } from "../../utils/warpAsync";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
+import { sendEmail, sendVerificationEmail } from "../../utils/sendEmail.util";
+import { generateVerificationToken } from "../../utils/generateCode.util";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
@@ -25,25 +26,21 @@ class RegisterService {
   }
 
   register = warpAsync(
-    async (userData: RegisterDtoType): Promise<responseHandler> => {
-      if (userData.password !== userData.confirmPassword)
-        return serviceResponse({
-          statusText: "BadRequest",
-          message: "Password and Confirm Password do not match.",
-        });
+    async (data: RegisterDtoType): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: RegisterDto,
+      });
+      if (!validationResult.success) return validationResult;
 
-      const formatData = validateAndFormatData(userData, RegisterDto);
-      if (!formatData.success) return formatData;
-
-      const existingUser = await this.isUserExisting(
-        userData.email,
-        String(userData.phoneNumber)
+      const checkUser = await this.isUserExisting(
+        data.email,
+        String(data.phoneNumber)
       );
-      if (!existingUser.success) return existingUser;
+      if (!checkUser.success) return checkUser;
 
-      // Add user caching & send otp
       const resultRegister = await this.processUserRegistration(
-        formatData.data
+        validationResult.data
       );
       if (!resultRegister.success) return resultRegister;
 
@@ -54,7 +51,7 @@ class RegisterService {
   private isUserExisting = async (
     email: string,
     phoneNumber: string
-  ): Promise<responseHandler> => {
+  ): Promise<ServiceResponseType> => {
     const getUserByEmail = await auth.getUserByEmail(email).catch(() => null);
     const getUserByPhone = await auth
       .getUserByPhoneNumber(phoneNumber)
@@ -74,10 +71,10 @@ class RegisterService {
   };
 
   private processUserRegistration = async (
-    userData: RegisterDtoType
-  ): Promise<responseHandler> => {
+    data: RegisterDtoType
+  ): Promise<ServiceResponseType> => {
     const token = await this.generateUniqueToken();
-    const existingOtp = await Otp.findOne({ email: userData.email }).lean();
+    const existingOtp = await Otp.findOne({ email: data.email }).lean();
     if (existingOtp) {
       return serviceResponse({
         statusText: "Conflict",
@@ -86,7 +83,7 @@ class RegisterService {
       });
     } else {
       await Otp.create({
-        email: userData.email,
+        email: data.email,
         token,
         expiresAt: new Date(Date.now() + 20 * 60 * 1000),
       });
@@ -94,13 +91,13 @@ class RegisterService {
 
     const verificationLink = `${process.env.BACKEND_URL}/auth/verify-email/${token}`;
     const resultSendEmail = await sendVerificationEmail(
-      String(userData.email),
+      String(data.email),
       "Verify Your Email",
-      sendEmail(verificationLink, userData.firstName + " " + userData.lastName)
+      sendEmail(verificationLink, data.firstName + " " + data.lastName)
     );
     if (!resultSendEmail.success) return resultSendEmail;
 
-    const resultCache = await this.saveUserInCache(userData, token);
+    const resultCache = await this.saveUserInCache(data, token);
     if (!resultCache.success) return resultCache;
 
     return serviceResponse({
@@ -118,13 +115,13 @@ class RegisterService {
   }
 
   private saveUserInCache = async (
-    userData: RegisterDtoType,
+    data: RegisterDtoType,
     token: string
-  ): Promise<responseHandler> => {
+  ): Promise<ServiceResponseType> => {
     const result = await redisClient.setEx(
       `token: ${token}`,
       1200,
-      JSON.stringify(userData)
+      JSON.stringify(data)
     );
 
     if (result !== "OK") {
@@ -139,8 +136,7 @@ class RegisterService {
 
   private addUserToDatabaseAndFirebase = async (
     token: string
-  ): Promise<responseHandler> => {
-    // Find and delete token
+  ): Promise<ServiceResponseType> => {
     const getOtp = await Otp.findOneAndDelete({ token });
     const getUserFromCaching = await redisClient.get(`token: ${token}`);
     if (
@@ -155,7 +151,7 @@ class RegisterService {
           "Try verifying your email again ,Your request to verify your email has expired or the link has already been used",
       });
 
-    const userData = JSON.parse(getUserFromCaching);
+    const data = JSON.parse(getUserFromCaching);
     const {
       email,
       password,
@@ -165,7 +161,7 @@ class RegisterService {
       gender,
       terms,
       accountType,
-    } = userData;
+    } = data;
 
     const [firebaseUser] = await Promise.all([
       auth.createUser({
@@ -176,7 +172,6 @@ class RegisterService {
     ]);
 
     const uid = firebaseUser.uid;
-    const prefixS3 = uuidv4();
     await Promise.all([
       User.create({ userId: uid, firstName, lastName, gender }),
       Security.create({
@@ -188,7 +183,7 @@ class RegisterService {
         dateOfJoining: Date.now(),
         terms,
       }),
-      Profile.create({ userId: uid, accountType, prefixS3 }),
+      Profile.create({ userId: uid, accountType, prefixS3: uuidv4() }),
       redisClient.del(`token:${token}`),
     ]);
     return serviceResponse({
@@ -196,7 +191,7 @@ class RegisterService {
     });
   };
 
-  async verifyEmail(token: string): Promise<responseHandler> {
+  async verifyEmail(token: string): Promise<ServiceResponseType> {
     const result = await this.addUserToDatabaseAndFirebase(token);
     if (!result.success) return result;
     return result;

@@ -1,24 +1,17 @@
 import express from "express";
 import AddressController from "../../controllers/user/address.controller";
-import { asyncHandler } from "../../middlewares/handleError";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import {
   expressValidator,
-  validateParamMiddleware,
-} from "../../middlewares/validatorMiddleware";
-import TokenMiddleware from "../../middlewares/token.middleware";
+  requiredParamMiddleware,
+} from "../../middlewares/validator.middleware";
 import {
   validateAddressAdd,
   validateAddressUpdate,
 } from "../../validation/user/address.validator";
-const role = ["user", "admin", "manager"];
+import { userAuthorizationMiddlewares } from "../../utils/authorizationRole.util";
 const controller = AddressController.getInstance();
-const tokenMiddleware = TokenMiddleware.getInstance();
 const router = express.Router();
-
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-];
 
 /**
  * @swagger
@@ -38,7 +31,7 @@ const commonMiddlewares = [
  */
 router.get(
   "/count",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.countAddress.bind(controller))
 );
 
@@ -66,8 +59,8 @@ router.get(
  */
 router.post(
   "/add",
-  ...commonMiddlewares,
-  asyncHandler(expressValidator(validateAddressAdd)),
+  ...userAuthorizationMiddlewares,
+  expressValidator(validateAddressAdd),
   asyncHandler(controller.addAddress.bind(controller))
 );
 
@@ -87,7 +80,7 @@ router.post(
  *              $ref: '#/components/schemas/AddressPostDTO'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/AddressResponse'
+ *         $ref: '#/components/schemas/AddressResponse'
  *       404:
  *         description: Address not found
  *       403:
@@ -96,10 +89,10 @@ router.post(
  *         description: Internal Server Error
  */
 router.put(
-  "/update/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
-  asyncHandler(expressValidator(validateAddressUpdate)),
+  "/update/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
+  expressValidator(validateAddressUpdate),
   asyncHandler(controller.updateAddress.bind(controller))
 );
 
@@ -122,9 +115,9 @@ router.put(
  *         description: Internal Server Error
  */
 router.delete(
-  "/delete/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/delete/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   asyncHandler(controller.deleteAddress.bind(controller))
 );
 
@@ -138,7 +131,7 @@ router.delete(
  *       - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/AddressResponse'
+ *         $ref: '#/components/schemas/AddressResponse'
  *       404:
  *         description: Address not found
  *       403:
@@ -147,9 +140,9 @@ router.delete(
  *         description: Internal Server Error
  */
 router.get(
-  "/get/:id?",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/get/:id",
+  ...userAuthorizationMiddlewares,
+  requiredParamMiddleware(),
   asyncHandler(controller.getAddress.bind(controller))
 );
 
@@ -161,7 +154,7 @@ router.get(
  *     tags: [Address]
  *     responses:
  *       200:
- *         $ref: '#/components/responses/AddressResponse'
+ *         $ref: '#/components/schemas/AddressResponse'
  *       404:
  *         description: Address not found
  *       403:
@@ -171,7 +164,7 @@ router.get(
  */
 router.get(
   "/",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.getAllAddress.bind(controller))
 );
 

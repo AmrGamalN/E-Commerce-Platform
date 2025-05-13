@@ -1,6 +1,7 @@
 import Security from "../../models/mongodb/user/security.model";
-import { warpAsync } from "../../utils/warpAsync";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
 import dotenv from "dotenv";
 import TokenService from "../../services/auth/token.service";
 import User from "../../models/mongodb/user/user.model";
@@ -21,7 +22,7 @@ class FacebookService {
   }
 
   registerByFacebook = warpAsync(
-    async (user: any): Promise<responseHandler> => {
+    async (user: any): Promise<ServiceResponseType> => {
       await this.handleFacebook(user);
       return serviceResponse({
         statusText: "Created",
@@ -29,27 +30,29 @@ class FacebookService {
     }
   );
 
-  loginByFacebook = warpAsync(async (user: any): Promise<responseHandler> => {
-    await this.handleFacebook(user);
-    const userSecurity = await Security.findOne({ email: user.email })
-      .select("email")
-      .lean();
-    if (!userSecurity)
+  loginByFacebook = warpAsync(
+    async (user: any): Promise<ServiceResponseType> => {
+      await this.handleFacebook(user);
+      const userSecurity = await Security.findOne({ email: user.email })
+        .select("email")
+        .lean();
+      if (!userSecurity)
+        return serviceResponse({
+          statusText: "NotFound",
+          message: "Account not found",
+        });
+      const tokens = await this.tokenService.generateTokens(userSecurity);
       return serviceResponse({
-        statusText: "NotFound",
-        message: "Account not found",
+        statusText: "OK",
+        message: "Login successful",
+        data: {
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          userId: userSecurity.userId,
+        },
       });
-    const tokens = await this.tokenService.generateTokens(userSecurity);
-    return serviceResponse({
-      statusText: "OK",
-      message: "Login successful",
-      data: {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        userId: userSecurity.userId,
-      },
-    });
-  });
+    }
+  );
 
   private handleFacebook = async (user: any): Promise<void> => {
     const isExistUser = await Security.exists({ email: user.email });

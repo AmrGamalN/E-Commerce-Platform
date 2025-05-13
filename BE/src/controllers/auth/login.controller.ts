@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import loginService from "../../services/auth/login.service";
 import { auth } from "../../config/firebase";
-import { encrypt } from "../../utils/encryptionAES";
+import { encrypt } from "../../utils/encryption.util";
 import FacebookService from "../../services/auth/facebook.service";
 import GoogleService from "../../services/auth/google.service";
 
@@ -92,8 +92,8 @@ class LoginController {
         sameSite: "strict",
       });
     });
-    await auth.revokeRefreshTokens(req.curUser.userId);
-    this.loginService.updateUserStatus(req.curUser.userId, "inactive");
+    await auth.revokeRefreshTokens(req.curUser?.userId!);
+    this.loginService.updateUserStatus(req.curUser?.userId, "inactive");
     return res.status(200).json({
       message: "Logged out successfully",
     });

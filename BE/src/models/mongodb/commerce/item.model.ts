@@ -16,6 +16,12 @@ const ItemCategorySchema = {
   subcategory: { type: String, required: true, trim: true },
   brand: { type: String, optional: true, trim: true },
   type: { type: String, optional: true },
+  path: [
+    {
+      id: { type: String, optional: true, default: "" },
+      label: { type: String, optional: true, default: "" },
+    },
+  ],
 };
 
 const ItemDetailsSchema = {
@@ -62,10 +68,6 @@ const ItemDetailsSchema = {
   allowNegotiate: { type: Boolean, default: false },
   isFirstItem: { type: Boolean, default: false },
   promotion: { type: Boolean, default: false },
-  reviewId: {
-    type: [String],
-    default: [],
-  },
   rate: {
     avgRating: {
       type: Number,
@@ -106,5 +108,5 @@ export const ItemSchema = new Schema(
   { timestamps: true }
 );
 
-const Item = model<ItemDtoType>("items", ItemSchema);
+const Item = model<ItemDtoType>("item_items", ItemSchema);
 export default Item;

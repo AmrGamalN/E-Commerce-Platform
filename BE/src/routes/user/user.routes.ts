@@ -1,42 +1,35 @@
 import express from "express";
 import UserController from "../../controllers/user/user.controller";
-import { asyncHandler } from "../../middlewares/handleError";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import { validateUserUpdate } from "../../validation/user/user.validator";
 import {
   expressValidator,
-  validateQueryFirebaseMiddleware,
-} from "../../middlewares/validatorMiddleware";
-const controller = UserController.getInstance();
-import TokenMiddleware from "../../middlewares/token.middleware";
-const tokenMiddleware = TokenMiddleware.getInstance();
-const role = ["user", "admin", "manager"];
-const router = express.Router();
+  requiredUserIdMiddleware,
+} from "../../middlewares/validator.middleware";
+import {
+  adminAuthorizationMiddlewares,
+  userAuthorizationMiddlewares,
+} from "../../utils/authorizationRole.util";
 
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-];
+const controller = UserController.getInstance();
+const router = express.Router();
 
 /**
  * @swagger
- * /user/update/{userId}:
+ * /user/update:
  *   put:
  *     summary: Update user
  *     description: Update user details
  *     tags: [User]
- *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
  *     requestBody:
  *       required: false
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *              - $ref: '#/components/schemas/ProfileUpdateDTO'
+ *                $ref: '#/components/schemas/UserUpdateDTO'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/UserResponse'
+ *         $ref: '#/components/schemas/UserResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -45,25 +38,24 @@ const commonMiddlewares = [
  *         description: Internal Server Error
  */
 router.put(
-  "/update/:userId?",
-  ...commonMiddlewares,
-  asyncHandler(validateQueryFirebaseMiddleware()),
-  asyncHandler(expressValidator(validateUserUpdate)),
+  "/update",
+  ...userAuthorizationMiddlewares,
+  expressValidator(validateUserUpdate),
   asyncHandler(controller.updateUser.bind(controller))
 );
 
 /**
  * @swagger
- * /user/get:
+ * /user/get/{userId}:
  *   get:
  *     summary: Get user
  *     description: Retrieve the profile details of the authenticated user
  *     tags: [User]
  *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
+ *       - $ref: '#/components/parameters/UserId'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/UserResponse'
+ *         $ref: '#/components/schemas/UserResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -72,9 +64,9 @@ router.put(
  *         description: Internal Server Error
  */
 router.get(
-  "/get/:userId?",
-  ...commonMiddlewares,
-  asyncHandler(validateQueryFirebaseMiddleware()),
+  "/get/:userId",
+  ...userAuthorizationMiddlewares,
+  requiredUserIdMiddleware(),
   asyncHandler(controller.getUser.bind(controller))
 );
 
@@ -83,14 +75,14 @@ router.get(
  * /user/get-all:
  *   get:
  *     summary: Get user
- *     description: Retrieve the profile details of the authenticated user
+ *     description: Get all the user details
  *     tags: [User]
  *     parameters:
  *       - $ref: '#/components/parameters/PageParam'
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/UserResponse'
+ *         $ref: '#/components/schemas/UserResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -100,8 +92,7 @@ router.get(
  */
 router.get(
   "/get-all",
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(["admin", "manager"])),
+  ...adminAuthorizationMiddlewares,
   asyncHandler(controller.getAllUsers.bind(controller))
 );
 
@@ -114,7 +105,7 @@ router.get(
  *     tags: [User]
  *     responses:
  *       200:
- *         $ref: '#/components/responses/UserResponse'
+ *         $ref: '#/components/schemas/UserResponse'
  *       404:
  *         description: User not found
  *       403:
@@ -125,7 +116,7 @@ router.get(
 // Get user model
 router.get(
   "/me",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.getMe.bind(controller))
 );
 

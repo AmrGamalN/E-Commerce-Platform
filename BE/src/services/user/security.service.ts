@@ -4,20 +4,21 @@ import {
   UserSecurityUpdateDto,
   UserSecurityUpdateDtoType,
 } from "../../dto/user/security.dto";
-import { warpAsync } from "../../utils/warpAsync";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
 import { auth } from "../../config/firebase";
 import {
   resetEmail,
   sendEmail,
   sendVerificationEmail,
-} from "../../utils/sendEmail";
-import { generateVerificationToken } from "../../utils/generateCode";
+} from "../../utils/sendEmail.util";
+import { generateVerificationToken } from "../../utils/generateCode.util";
 import Otp from "../../models/mongodb/user/otp.model";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
-import { Pagination } from "../../utils/pagination";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
+import { generatePagination } from "../../utils/generatePagination.util";
 
 class SecurityService {
   private static instanceService: SecurityService;
@@ -28,101 +29,111 @@ class SecurityService {
     return SecurityService.instanceService;
   }
 
-  getSecurity = warpAsync(async (query: object): Promise<responseHandler> => {
-    const getSecurity = await Security.findOne(query).lean();
-    return validateAndFormatData(getSecurity, UserSecurityDto);
-  });
-
-  getAllSecurities = warpAsync(
-    async (args: { page: number; limit: number }): Promise<responseHandler> => {
-      const count = await this.countSecurity();
-      return Pagination(Security, UserSecurityDto, count.count ?? 0, args);
-    }
-  );
-
-  updateSecurity = warpAsync(
-    async (
-      SecurityData: UserSecurityUpdateDtoType,
-      query: object
-    ): Promise<responseHandler> => {
-      const parseSafe = validateAndFormatData(
-        SecurityData,
-        UserSecurityUpdateDto,
-        "update"
-      );
-      if (!parseSafe.success) return parseSafe;
-
-      const updateSecurity = await Security.findOneAndUpdate(
-        query,
-        {
-          $set: {
-            ...parseSafe.data,
-          },
-        },
-        {
-          new: true,
-        }
-      ).lean();
-
-      return serviceResponse({
-        data: updateSecurity,
+  getSecurity = warpAsync(
+    async (userId: object): Promise<ServiceResponseType> => {
+      return validateAndFormatData({
+        data: await Security.findOne({ userId }).lean(),
+        userDto: UserSecurityDto,
       });
     }
   );
 
-  countSecurity = warpAsync(async (): Promise<responseHandler> => {
+  getAllSecurities = warpAsync(
+    async (queries: {
+      page: number;
+      limit: number;
+    }): Promise<ServiceResponseType> => {
+      const count = await this.countSecurity();
+      return await generatePagination({
+        model: Security,
+        userDto: UserSecurityDto,
+        totalCount: count.count,
+        paginationOptions: {
+          page: queries.page,
+          limit: queries.limit,
+        },
+      });
+    }
+  );
+
+  updateSecurity = warpAsync(
+    async (data: UserSecurityUpdateDtoType): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: UserSecurityUpdateDto,
+        actionType: "update",
+      });
+      if (!validationResult.success) return validationResult;
+
+      const updateSecurity = await Security.updateOne(
+         { userId: data.userId },
+        {
+          $set: {
+            ...validationResult.data,
+          },
+        }
+      );
+      return serviceResponse({
+        updatedCount: updateSecurity.modifiedCount,
+      });
+    }
+  );
+
+  countSecurity = warpAsync(async (): Promise<ServiceResponseType> => {
     return serviceResponse({
       count: await Security.countDocuments(),
     });
   });
 
   deleteBlockUser = warpAsync(
-    async (userId: string, processType: object): Promise<responseHandler> => {
-      const getUser = await Security.findOneAndUpdate(
+    async (userId: string, status: object): Promise<ServiceResponseType> => {
+      const updateUser = await Security.updateOne(
         { userId },
         {
-          $set: processType,
-        },
-        {
-          new: true,
+          $set: status,
         }
-      ).lean();
+      );
       return serviceResponse({
-        data: getUser,
+        updatedCount: updateUser.modifiedCount,
       });
     }
   );
 
-  resetPassword = warpAsync(async (email: string): Promise<responseHandler> => {
-    const passwordResetLink = await auth.generatePasswordResetLink(email);
-    if (!passwordResetLink)
+  resetPassword = warpAsync(
+    async (email: string): Promise<ServiceResponseType> => {
+      const passwordResetLink = await auth.generatePasswordResetLink(email);
+      if (!passwordResetLink)
+        return serviceResponse({
+          statusText: "NotFound",
+          message: "Invalid email",
+        });
+
+      const sendLink = await sendVerificationEmail(
+        email,
+        "Reset password",
+        resetEmail(passwordResetLink, email)
+      );
+
+      if (!sendLink.success)
+        return serviceResponse({
+          statusText: "BadRequest",
+          message: "Something error, Please try aging",
+        });
+
       return serviceResponse({
-        statusText: "NotFound",
-        message: "Invalid email",
+        statusText: "OK",
+        message:
+          "Send link to your email ,Please check your email to reset password",
+        data: passwordResetLink,
       });
-
-    const sendLink = await sendVerificationEmail(
-      email,
-      "Reset password",
-      resetEmail(passwordResetLink, email)
-    );
-
-    if (!sendLink.success)
-      return serviceResponse({
-        statusText: "BadRequest",
-        message: "Something error, Please try aging",
-      });
-
-    return serviceResponse({
-      statusText: "OK",
-      message:
-        "Send link to your email ,Please check your email to reset password",
-      data: passwordResetLink,
-    });
-  });
+    }
+  );
 
   updatePassword = warpAsync(
-    async (userId: string, newPassword: string): Promise<responseHandler> => {
+    async (
+      userId: string,
+      newPassword: string
+    ): Promise<ServiceResponseType> => {
       const updatedUser = await auth.updateUser(userId, {
         password: newPassword,
       });
@@ -139,7 +150,7 @@ class SecurityService {
   );
 
   sendVerificationEmail = warpAsync(
-    async (email: string): Promise<responseHandler> => {
+    async (email: string): Promise<ServiceResponseType> => {
       const token = await this.generateUniqueToken();
       const existingOtp = await Otp.findOne({ email }).lean();
 
@@ -181,7 +192,7 @@ class SecurityService {
   }
 
   generateTwoFactorAuth = warpAsync(
-    async (userId: string): Promise<responseHandler> => {
+    async (userId: string): Promise<ServiceResponseType> => {
       const getUserSecurity = await Security.findOne({
         userId,
         isTwoFactorAuth: { $ne: true },
@@ -224,7 +235,10 @@ class SecurityService {
   );
 
   verifyTwoFactorAuth = warpAsync(
-    async (userId: string, twoFactorCode: string): Promise<responseHandler> => {
+    async (
+      userId: string,
+      twoFactorCode: string
+    ): Promise<ServiceResponseType> => {
       const userSecurity = await Security.findOne({
         userId,
       })
