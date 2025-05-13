@@ -6,7 +6,10 @@ HallaDeals-BE is the backend service for the HallaDeals platform. It provides AP
 - https://e-commerce-platform-5pih.onrender.com/api-docs/user
 - https://e-commerce-platform-5pih.onrender.com/api-docs/commerce
 
-- ## Api Docs For Preview
+## Live demo
+- https://e-commerce-platform-woad.vercel.app/
+
+ ## Swagger Api
 - User Api
 ![1](https://github.com/user-attachments/assets/3cc712c4-e642-4865-8f34-7c38eea54187)
 
