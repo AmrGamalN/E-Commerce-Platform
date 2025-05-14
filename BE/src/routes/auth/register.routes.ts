@@ -1,10 +1,10 @@
 import express from "express";
 import RegisterController from "../../controllers/auth/register.controller";
-import { asyncHandler } from "../../middlewares/handleError";
-import { expressValidator } from "../../middlewares/validatorMiddleware";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
+import { expressValidator } from "../../middlewares/validator.middleware";
 import { registerValidator } from "../../validation/auth/register.validator";
 const controller = RegisterController.getInstance();
-import TokenMiddleware from "../../middlewares/token.middleware";
+import TokenMiddleware from "../../middlewares/authentication.middleware";
 const tokenMiddleware = TokenMiddleware.getInstance();
 const router = express.Router();
 
@@ -22,7 +22,7 @@ const router = express.Router();
  *             $ref: '#/components/schemas/RegisterDto'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/RegisterResponse'
+ *         $ref: '#/components/schemas/RegisterResponse'
  *       400:
  *         description: Bad Request
  *       404:
@@ -34,7 +34,7 @@ const router = express.Router();
  */
 router.post(
   "/email",
-  asyncHandler(expressValidator(registerValidator)),
+  expressValidator(registerValidator),
   asyncHandler(controller.register.bind(controller))
 );
 
@@ -56,7 +56,7 @@ router.post(
  *                 description: Facebook ID Token
  *     responses:
  *       200:
- *         $ref: '#/components/responses/RegisterResponse'
+ *         $ref: '#/components/schemas/RegisterResponse'
  *       400:
  *         description: Bad Request
  *       404:
@@ -90,7 +90,7 @@ router.post(
  *                 description: Google ID Token
  *     responses:
  *       200:
- *         $ref: '#/components/responses/RegisterResponse'
+ *         $ref: '#/components/schemas/RegisterResponse'
  *       400:
  *         description: Bad Request
  *       404:

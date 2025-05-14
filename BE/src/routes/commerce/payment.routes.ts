@@ -1,18 +1,9 @@
 import express from "express";
 import PaymentController from "../../controllers/commerce/payment.controller";
-import { asyncHandler } from "../../middlewares/handleError";
-import { expressValidator } from "../../middlewares/validatorMiddleware";
-import TokenMiddleware from "../../middlewares/token.middleware";
-const tokenMiddleware = TokenMiddleware.getInstance();
+import { asyncHandler } from "../../middlewares/handleError.middleware";
+import { userAuthorizationMiddlewares } from "../../utils/authorizationRole.util";
 const controller = PaymentController.getInstance();
-const role = ["user", "admin", "manager"];
 const router = express.Router();
-
-// Middleware access token & refresh token and authorization
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-];
 
 /**
  * @swagger
@@ -22,7 +13,7 @@ const commonMiddlewares = [
  *     tags: [Payment]
  *     responses:
  *       200:
- *         $ref: '#/components/responses/PaymentResponse'
+ *         $ref: '#/components/schemas/PaymentResponse'
  *       404:
  *         description: Payment not found
  *       403:
@@ -34,7 +25,7 @@ const commonMiddlewares = [
 // Get user paymentOption
 router.get(
   "/",
-  ...commonMiddlewares,
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.getPaymentOption.bind(controller))
 );
 

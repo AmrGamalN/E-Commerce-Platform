@@ -1,6 +1,6 @@
 import CategoryService from "../../services/commerce/category.service";
 import { Request, Response } from "express";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 class CategoryController {
   private serviceInstance: CategoryService;

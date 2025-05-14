@@ -1,11 +1,15 @@
 {
-  "name": "halladeals-be",
+  "name": "halladeals-BE",
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon --exec ts-node app.ts",
+    "start": "node dist/app.js",
+    "build": "tsc",
+    "serve": "node dist/app.js",
+    "stop": "pkill -f node",
+    "restart": "npm run stop && npm run start",
     "dev": "node-dev app.ts"
   },
   "keywords": [],

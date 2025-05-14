@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import SecurityService from "../../services/user/security.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 class SecurityController {
   private static instance: SecurityController;
@@ -16,7 +16,7 @@ class SecurityController {
   }
 
   async getSecurity(req: Request, res: Response): Promise<Response> {
-    const result = await this.SecurityService.getSecurity(req.body.id);
+    const result = await this.SecurityService.getSecurity(req.params.userId);
     return controllerResponse(res, result);
   }
 
@@ -26,10 +26,7 @@ class SecurityController {
   }
 
   async updateSecurity(req: Request, res: Response): Promise<Response> {
-    const result = await this.SecurityService.updateSecurity(
-      req.body,
-      req.body.id
-    );
+    const result = await this.SecurityService.updateSecurity(req.body);
     return controllerResponse(res, result);
   }
 
@@ -70,7 +67,7 @@ class SecurityController {
 
   async generateTwoFactorAuth(req: Request, res: Response): Promise<Response> {
     const result = await this.SecurityService.generateTwoFactorAuth(
-      req.body.id
+      req.curUser?.userId
     );
     if (!result.success || !result) return res.status(400).json(result);
     res.setHeader("Content-type", "image/png");
@@ -80,7 +77,7 @@ class SecurityController {
 
   async verifyTwoFactorAuth(req: Request, res: Response): Promise<Response> {
     const result = await this.SecurityService.verifyTwoFactorAuth(
-      req.body.id,
+      req.curUser?.userId,
       req.body.twoFactorCode
     );
     return controllerResponse(res, result);

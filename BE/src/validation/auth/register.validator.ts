@@ -25,7 +25,17 @@ export const registerValidator = [
     })
     .withMessage(
       "Password must be at least 10 characters long, contain at least two uppercase letters, two lowercase letters, two numbers, and two symbols."
-    ),
+  ),
+  
+  check("confirmPassword")
+    .trim()
+    .notEmpty()
+    .withMessage("Confirm password is required").custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error("Passwords do not match");
+      }
+      return true;
+    }),
 
   check("phoneNumber")
     .optional({ checkFalsy: true })

@@ -2,10 +2,9 @@ import express from "express";
 import SecurityController from "../../controllers/user/security.controller";
 import {
   expressValidator,
-  validateQueryFirebaseMiddleware,
-  validateParamMiddleware,
-} from "../../middlewares/validatorMiddleware";
-import { asyncHandler } from "../../middlewares/handleError";
+  requiredUserIdMiddleware,
+} from "../../middlewares/validator.middleware";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import {
   validateUserSecurityUpdate,
   validateSecurityEmail,
@@ -13,34 +12,29 @@ import {
   validateSecurityStatus,
   validateCode2AF,
 } from "../../validation/user/security.validator";
-import TokenMiddleware from "../../middlewares/token.middleware";
-const tokenMiddleware = TokenMiddleware.getInstance();
+import {
+  adminAuthorizationMiddlewares,
+  userAuthorizationMiddlewares,
+} from "../../utils/authorizationRole.util";
+
 const controller = SecurityController.getInstance();
 const router = express.Router();
-const role = ["user", "admin", "manager"];
-
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(["admin", "manager"])),
-];
 
 /**
  * @swagger
- * /user/security/update/{userId}:
+ * /user/security/update:
  *   put:
  *     summary: Update user security settings
  *     tags: [Security]
- *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
  *     requestBody:
  *       required: false
  *       content:
  *         application/json:
  *           schema:
- *             - $ref: '#/components/schemas/SecurityUpdateDTO'
+ *             $ref: '#/components/schemas/SecurityUpdateDTO'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/SecurityResponse'
+ *         $ref: '#/components/schemas/SecurityResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -49,9 +43,8 @@ const commonMiddlewares = [
  *         description: Internal Server Error
  */
 router.put(
-  "/update/:userId?",
-  ...commonMiddlewares,
-  asyncHandler(validateQueryFirebaseMiddleware()),
+  "/update",
+  ...adminAuthorizationMiddlewares,
   asyncHandler(expressValidator(validateUserSecurityUpdate)),
   asyncHandler(controller.updateSecurity.bind(controller))
 );
@@ -74,7 +67,7 @@ router.put(
  */
 router.get(
   "/count",
-  ...commonMiddlewares,
+  ...adminAuthorizationMiddlewares,
   asyncHandler(controller.countSecurity.bind(controller))
 );
 
@@ -84,23 +77,12 @@ router.get(
  *   post:
  *     summary: Block or delete a user account
  *     tags: [Security]
- *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
  *     requestBody:
  *       required: false
  *       content:
  *         application/json:
  *           schema:
- *            - type: object
- *              properties:
- *                block:
- *                  type: boolean
- *                  default: false
- *                  description: "Set to true to block the user account (optional)"
- *                delete:
- *                  type: boolean
- *                  default: false
- *                  description: "Set to true to delete the user account (optional)"
+ *             $ref: '#/components/schemas/UserActionDto'
  *     responses:
  *       200:
  *         $ref: '#/components/schemas/BaseResponse'
@@ -112,10 +94,9 @@ router.get(
  *         description: Internal Server Error
  */
 router.post(
-  "/block-delete/:userId?",
-  ...commonMiddlewares,
-  asyncHandler(validateQueryFirebaseMiddleware()),
-  asyncHandler(expressValidator(validateSecurityStatus)),
+  "/block-delete",
+  ...adminAuthorizationMiddlewares,
+  expressValidator(validateSecurityStatus),
   asyncHandler(controller.deleteBlockUser.bind(controller))
 );
 
@@ -149,7 +130,7 @@ router.post(
  */
 router.post(
   "/reset",
-  asyncHandler(expressValidator(validateSecurityEmail)),
+  expressValidator(validateSecurityEmail),
   asyncHandler(controller.resetPassword.bind(controller))
 );
 
@@ -183,15 +164,14 @@ router.post(
  */
 router.post(
   "/update-password",
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-  asyncHandler(expressValidator(validateSecurityUpdatePass)),
+  ...userAuthorizationMiddlewares,
+  expressValidator(validateSecurityUpdatePass),
   asyncHandler(controller.updatePassword.bind(controller))
 );
 
 /**
  * @swagger
- * /user/security/request-email-verification:
+ * /user/security/verify-email:
  *   post:
  *     summary: Send a verification email to confirm the user's email address
  *     tags: [Security]
@@ -216,8 +196,8 @@ router.post(
  *         description: Internal Server Error
  */
 router.post(
-  "/request-email-verification",
-  asyncHandler(expressValidator(validateSecurityEmail)),
+  "/verify-email",
+  expressValidator(validateSecurityEmail),
   asyncHandler(controller.sendVerificationEmail.bind(controller))
 );
 
@@ -239,7 +219,7 @@ router.post(
  */
 router.post(
   "/generate/2fa",
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.generateTwoFactorAuth.bind(controller))
 );
 
@@ -272,23 +252,23 @@ router.post(
  */
 router.post(
   "/confirm/2fa",
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-  asyncHandler(expressValidator(validateCode2AF)),
+  ...userAuthorizationMiddlewares,
+  expressValidator(validateCode2AF),
   asyncHandler(controller.verifyTwoFactorAuth.bind(controller))
 );
 
 /**
  * @swagger
- * /user/security/get:
+ * /user/security/get/{userId}:
  *   get:
  *     summary: Get user security
  *     description: Retrieve the Security details of the authenticated user
  *     tags: [Security]
  *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
+ *       - $ref: '#/components/parameters/UserId'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/SecurityResponse'
+ *         $ref: '#/components/schemas/SecurityResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -297,9 +277,9 @@ router.post(
  *         description: Internal Server Error
  */
 router.get(
-  "/get",
-  ...commonMiddlewares,
-  asyncHandler(validateParamMiddleware()),
+  "/get/:userId",
+  ...adminAuthorizationMiddlewares,
+  requiredUserIdMiddleware(),
   asyncHandler(controller.getSecurity.bind(controller))
 );
 
@@ -315,7 +295,7 @@ router.get(
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/SecurityResponse'
+ *         $ref: '#/components/schemas/SecurityResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -325,7 +305,7 @@ router.get(
  */
 router.get(
   "/get-all",
-  ...commonMiddlewares,
+  ...adminAuthorizationMiddlewares,
   asyncHandler(controller.getAllSecurities.bind(controller))
 );
 

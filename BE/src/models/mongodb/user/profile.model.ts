@@ -90,5 +90,5 @@ const ProfileSchema = new Schema(
   { timestamps: true }
 );
 
-const Profile = model<ProfileDtoType>("Profile", ProfileSchema);
+const Profile = model<ProfileDtoType>("user_profiles", ProfileSchema);
 export default Profile;

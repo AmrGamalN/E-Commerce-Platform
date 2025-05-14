@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import ItemService from "../../services/commerce/item.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 class ItemController {
   private static Instance: ItemController;
   private serviceInstance: ItemService;
@@ -24,13 +24,20 @@ class ItemController {
   }
 
   async getItem(req: Request, res: Response): Promise<Response> {
-    const retrievedItem = await this.serviceInstance.getItem(req.body.id);
+    const retrievedItem = await this.serviceInstance.getItem(req.params.id);
     return controllerResponse(res, retrievedItem);
   }
 
   async getAllItem(req: Request, res: Response): Promise<Response> {
-    const retrievedItems = await this.serviceInstance.getAllItem(req.query);
+    const { price, createdAt, ...filters } = req.query;
+    const sort = { price, createdAt };
+    const retrievedItems = await this.serviceInstance.getAllItem(filters, sort);
     return controllerResponse(res, retrievedItems);
+  }
+
+  async countItems(req: Request, res: Response): Promise<Response> {
+    const count = await this.serviceInstance.countItems(req.query);
+    return controllerResponse(res, count);
   }
 
   async getItemByCategoryId(req: Request, res: Response): Promise<Response> {
@@ -50,7 +57,7 @@ class ItemController {
   async updateItem(req: Request, res: Response): Promise<Response> {
     const updatedItem = await this.serviceInstance.updateItem(
       req.body,
-      req.body.id
+      req.params.id
     );
     return controllerResponse(res, updatedItem);
   }
@@ -58,24 +65,14 @@ class ItemController {
   async deleteImages(req: Request, res: Response): Promise<Response> {
     const deleteImage = await this.serviceInstance.deleteImages(
       req.body.deleteImageKeys,
-      req.body.id
+      req.params.id
     );
     return controllerResponse(res, deleteImage);
   }
 
-  async countItems(req: Request, res: Response): Promise<Response> {
-    const count = await this.serviceInstance.countItems();
-    return controllerResponse(res, count);
-  }
-
   async deleteItem(req: Request, res: Response): Promise<Response> {
-    const deletedItem = await this.serviceInstance.deleteItem(req.body.id);
+    const deletedItem = await this.serviceInstance.deleteItem(req.params.id);
     return controllerResponse(res, deletedItem);
-  }
-
-  async filterItem(req: Request, res: Response): Promise<Response> {
-    const retrievedItems = await this.serviceInstance.filterItem(req.query);
-    return controllerResponse(res, retrievedItems);
   }
 }
 

@@ -1,8 +1,9 @@
 import { UserPaymentDto } from "../../dto/commerce/payment.dto";
-import { warpAsync } from "../../utils/warpAsync";
-import { responseHandler } from "../../utils/responseHandler";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { ServiceResponseType } from "../../types/response.type";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
 import Profile from "../../models/mongodb/user/profile.model";
+import { serviceResponse } from "../../utils/response.util";
 
 class PaymentService {
   private static Instance: PaymentService;
@@ -15,13 +16,21 @@ class PaymentService {
   }
 
   getPaymentOption = warpAsync(
-    async (userId: string): Promise<responseHandler> => {
-      const retrievedPayment = await Profile.findOne({
+    async (userId: string): Promise<ServiceResponseType> => {
+      const data = await Profile.findOne({
         userId: userId,
       })
         .select("paymentOptions")
         .lean();
-      return validateAndFormatData(retrievedPayment?.paymentOptions, UserPaymentDto);
+      const validatedData = validateAndFormatData({
+        data,
+        userDto: UserPaymentDto,
+      });
+
+      return serviceResponse({
+        statusText: "OK",
+        data: validatedData.data.paymentOptions,
+      });
     }
   );
 }

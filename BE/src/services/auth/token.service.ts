@@ -1,10 +1,11 @@
-import { warpAsync } from "../../utils/warpAsync";
+import { warpAsync } from "../../utils/warpAsync.util";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import { UserSecurityDtoType } from "../../dto/user/security.dto";
 import User from "../../models/mongodb/user/user.model";
 import Profile from "../../models/mongodb/user/profile.model";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
 dotenv.config();
 
 class TokenService {
@@ -20,7 +21,7 @@ class TokenService {
     async (
       credential: { email: string } | { phoneNumber: string },
       role: string
-    ): Promise<responseHandler> => {
+    ): Promise<ServiceResponseType> => {
       const payload = { ...credential, role: role };
       const tempToken = jwt.sign(
         payload,
@@ -43,7 +44,7 @@ class TokenService {
   );
 
   generateTokens = warpAsync(
-    async (userSecurity: UserSecurityDtoType): Promise<responseHandler> => {
+    async (userSecurity: UserSecurityDtoType): Promise<ServiceResponseType> => {
       const user = await User.findOne({ userId: userSecurity.userId })
         .select({
           firstName: 1,
@@ -65,6 +66,9 @@ class TokenService {
         profileImage: profile?.profileImage,
         userName: profile?.userName,
         dateOfJoining: userSecurity.dateOfJoining,
+        sign_up_provider: userSecurity.sign_up_provider,
+        sign_in_provider: userSecurity.sign_in_provider,
+        isEmailVerified: userSecurity.isEmailVerified,
         lastSeen: new Date().toISOString(),
       };
 
@@ -86,11 +90,6 @@ class TokenService {
         }
       );
 
-      if (!accessToken || !refreshToken)
-        return serviceResponse({
-          statusText: "Unauthorized",
-          message: "Failed to login, please try again later",
-        });
       return {
         success: true,
         accessToken: accessToken,
@@ -100,7 +99,7 @@ class TokenService {
   );
 
   verifyTempToken = warpAsync(
-    async (authHeader: string): Promise<responseHandler> => {
+    async (authHeader: string): Promise<ServiceResponseType> => {
       const token = authHeader.split(" ")[1];
       const decoded = jwt.verify(
         token,

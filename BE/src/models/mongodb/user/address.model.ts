@@ -21,5 +21,5 @@ const addressSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-const Address = model<AddressDtoType>("addresses", addressSchema);
+const Address = model<AddressDtoType>("user_addresses", addressSchema);
 export default Address;

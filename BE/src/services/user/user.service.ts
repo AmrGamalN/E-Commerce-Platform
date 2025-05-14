@@ -4,11 +4,12 @@ import {
   UserUpdateDto,
   UserUpdateDtoType,
 } from "../../dto/user/user.dto";
-import { warpAsync } from "../../utils/warpAsync";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
 import AddressService from "./address.service";
-import { Pagination } from "../../utils/pagination";
+import { generatePagination } from "../../utils/generatePagination.util";
 
 class UserService {
   private static instanceService: UserService;
@@ -26,50 +27,60 @@ class UserService {
   }
 
   updateUser = warpAsync(
-    async (
-      UserData: UserUpdateDtoType,
-      query: object
-    ): Promise<responseHandler> => {
-      const parseSafe = validateAndFormatData(UserData, UserUpdateDto,"update");
-      if (!parseSafe.success) return parseSafe;
+    async (data: UserUpdateDtoType): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: UserUpdateDto,
+        actionType: "update",
+      });
+      if (!validationResult.success) return validationResult;
 
-      const updateUser = await User.findOneAndUpdate(
-        query,
+      const updateUser = await User.updateOne(
+        { userId: data.userId },
         {
           $set: {
-            ...UserData,
+            ...data,
           },
-        },
-        {
-          new: true,
         }
-      ).lean();
-
+      );
       return serviceResponse({
-        data: updateUser,
+        updatedCount: updateUser.modifiedCount,
       });
     }
   );
 
-  getUser = warpAsync(async (query: object): Promise<responseHandler> => {
-    const getUser = await User.findOne(query).lean();
-    return validateAndFormatData(getUser, UserDto);
+  getUser = warpAsync(async (userId: string): Promise<ServiceResponseType> => {
+    return validateAndFormatData({
+      data: await User.findOne({ userId }).lean(),
+      userDto: UserDto,
+    });
   });
 
   getAllUsers = warpAsync(
-    async (args: { page: number; limit: number }): Promise<responseHandler> => {
+    async (queries: {
+      page: number;
+      limit: number;
+    }): Promise<ServiceResponseType> => {
       const count = await this.countUser();
-      return Pagination(User, UserDto, count.count ?? 0, args);
+      return await generatePagination({
+        model: User,
+        userDto: UserDto,
+        totalCount: count.count,
+        paginationOptions: {
+          page: queries.page,
+          limit: queries.limit,
+        },
+      });
     }
   );
 
-  countUser = warpAsync(async (): Promise<responseHandler> => {
+  countUser = warpAsync(async (): Promise<ServiceResponseType> => {
     return serviceResponse({
       count: await User.countDocuments(),
     });
   });
 
-  getMe = warpAsync(async (curUser): Promise<responseHandler> => {
+  getMe = warpAsync(async (curUser): Promise<ServiceResponseType> => {
     const {
       userId,
       name,
@@ -83,7 +94,7 @@ class UserService {
     } = curUser;
 
     const [user, userAddress] = await Promise.all([
-      this.getUser({userId}),
+      this.getUser({ userId }),
       this.addressService.getAllAddress(userId),
     ]);
 

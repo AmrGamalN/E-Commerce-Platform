@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import UserService from "../../services/user/user.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -29,7 +29,7 @@ class UserController {
   }
 
   async getUser(req: Request, res: Response): Promise<Response> {
-    const result = await this.userService.getUser(req.body.id);
+    const result = await this.userService.getUser(req.params.userId);
     return controllerResponse(res, result);
   }
 
@@ -44,7 +44,7 @@ class UserController {
   }
 
   async updateUser(req: Request, res: Response): Promise<Response> {
-    const result = await this.userService.updateUser(req.body, req.body.id);
+    const result = await this.userService.updateUser(req.body);
     return controllerResponse(res, result);
   }
 }

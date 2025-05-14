@@ -1,34 +1,29 @@
 import express from "express";
 import ProfileController from "../../controllers/user/profile.controller";
-import { asyncHandler } from "../../middlewares/handleError";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
 import {
   expressValidator,
-  validateQueryFirebaseMiddleware,
-} from "../../middlewares/validatorMiddleware";
+  requiredUserIdMiddleware,
+} from "../../middlewares/validator.middleware";
 import { validateProfileUpdate } from "../../validation/user/profile.validator";
-const controller = ProfileController.getInstance();
-import TokenMiddleware from "../../middlewares/token.middleware";
 import MiddlewareUploadFile from "../../middlewares/uploadFile.middleware";
-const middlewareUploadFile = MiddlewareUploadFile.getInstance();
 import { userImageParser } from "../../middlewares/parser.middleware";
-const tokenMiddleware = TokenMiddleware.getInstance();
-const role = ["user", "admin", "manager"];
+import {
+  adminAuthorizationMiddlewares,
+  userAuthorizationMiddlewares,
+} from "../../utils/authorizationRole.util";
+const controller = ProfileController.getInstance();
+const middlewareUploadFile = MiddlewareUploadFile.getInstance();
 const router = express.Router();
-
-const commonMiddlewares = [
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
-];
 
 /**
  * @swagger
- * /user/profile/update/{userId}:
+ * /user/profile/update:
  *   put:
  *     summary: Update user profile
  *     description: Update user profile details including business, personal, and payment options
  *     tags: [Profile]
  *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
  *       - name: prefix
  *         in: query
  *         required: false
@@ -48,10 +43,10 @@ const commonMiddlewares = [
  *       content:
  *         multipart/form-data:
  *           schema:
- *             - $ref: '#/components/schemas/ProfileUpdateDTO'
+ *             $ref: '#/components/schemas/ProfileUpdateDTO'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ProfileResponse'
+ *         $ref: '#/components/schemas/ProfileResponse'
  *       403:
  *         description: Unauthorized
  *       404:
@@ -61,8 +56,7 @@ const commonMiddlewares = [
  */
 router.put(
   "/update",
-  ...commonMiddlewares,
-  asyncHandler(validateQueryFirebaseMiddleware()),
+  ...userAuthorizationMiddlewares,
   middlewareUploadFile.detectS3Folder,
   middlewareUploadFile.countImagesBeforeUpload,
   middlewareUploadFile.markUnchangedImages,
@@ -84,7 +78,7 @@ router.put(
  *       - $ref: '#/components/parameters/LimitParam'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ProfileResponse'
+ *         $ref: '#/components/schemas/ProfileResponse'
  *       404:
  *         description: Profile not found
  *       403:
@@ -94,23 +88,22 @@ router.put(
  */
 router.get(
   "/get-all",
-  asyncHandler(tokenMiddleware.refreshTokenMiddleware),
-  asyncHandler(tokenMiddleware.authorizationMiddleware(["admin", "manager"])),
+  ...adminAuthorizationMiddlewares,
   asyncHandler(controller.getAllProfiles.bind(controller))
 );
 
 /**
  * @swagger
- * /user/profile/get:
+ * /user/profile/get/{userId}:
  *   get:
  *     summary: Get user profile
  *     description: Retrieve the profile details of the authenticated user
  *     tags: [Profile]
  *     parameters:
- *       - $ref: '#/components/parameters/userIdComponents'
+ *       - $ref: '#/components/parameters/UserId'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ProfileResponse'
+ *         $ref: '#/components/schemas/ProfileResponse'
  *       404:
  *         description: Profile not found
  *       403:
@@ -119,9 +112,9 @@ router.get(
  *         description: Internal Server Error
  */
 router.get(
-  "/get/:userId?",
-  ...commonMiddlewares,
-  asyncHandler(validateQueryFirebaseMiddleware()),
+  "/get/:userId",
+  ...userAuthorizationMiddlewares,
+  requiredUserIdMiddleware(),
   asyncHandler(controller.getProfile.bind(controller))
 );
 
@@ -136,7 +129,7 @@ router.get(
  *       - $ref: '#/components/parameters/Id'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/ProfileResponse'
+ *         $ref: '#/components/schemas/ProfileResponse'
  *       404:
  *         description: Profile not found
  *       403:
@@ -145,8 +138,8 @@ router.get(
  *         description: Internal Server Error
  */
 router.get(
-  "/:id?",
-  ...commonMiddlewares,
+  "/:id",
+  ...userAuthorizationMiddlewares,
   asyncHandler(controller.getProfileByLink.bind(controller))
 );
 export default router;

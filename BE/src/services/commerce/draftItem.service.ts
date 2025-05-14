@@ -3,11 +3,17 @@ import {
   ItemDraftDto,
   ItemDraftDtoType,
 } from "../../dto/commerce/draftItem.dto";
-import { warpAsync } from "../../utils/warpAsync";
-import { serviceResponse, responseHandler } from "../../utils/responseHandler";
-import { validateAndFormatData } from "../../utils/validateAndFormatData";
-import { Pagination } from "../../utils/pagination";
+import { warpAsync } from "../../utils/warpAsync.util";
+import { serviceResponse } from "../../utils/response.util";
+import { ServiceResponseType } from "../../types/response.type";
+import { validateAndFormatData } from "../../utils/validateAndFormatData.util";
 import { v4 as uuidv4 } from "uuid";
+import {
+  generateFilters,
+  generateSort,
+} from "../../utils/generateFilter&Sort.util";
+import { generatePagination } from "../../utils/generatePagination.util";
+import { ItemFiltersType, ItemSortType } from "../../types/filter.type";
 
 class DraftItemService {
   private static Instance: DraftItemService;
@@ -20,16 +26,22 @@ class DraftItemService {
   }
 
   addDraftItem = warpAsync(
-    async (data: ItemDraftDtoType, curUser: any): Promise<responseHandler> => {
-      const parsed = validateAndFormatData(data, ItemDraftDto);
-      const prefixS3 = uuidv4();
+    async (
+      data: ItemDraftDtoType,
+      curUser: any
+    ): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: ItemDraftDto,
+      });
+      if (!validationResult.success) return validationResult;
       await DraftItem.create({
-        ...parsed.data,
+        ...validationResult.data,
         userId: curUser.userId,
         userName: curUser.name,
         userImage: curUser.profileImage?.imageUrl,
         phone: curUser?.phone,
-        prefixS3,
+        prefixS3: uuidv4(),
       });
       return serviceResponse({
         statusText: "Created",
@@ -37,29 +49,66 @@ class DraftItemService {
     }
   );
 
-  getDraftItem = warpAsync(async (query: object): Promise<responseHandler> => {
-    const retrievedDraftItem = await DraftItem.findOne(query).lean();
-    const validate = validateAndFormatData(retrievedDraftItem, ItemDraftDto);
-    return serviceResponse({
-      statusText: "OK",
-      data: validate.data,
-    });
-  });
+  getDraftItem = warpAsync(
+    async (_id: string): Promise<ServiceResponseType> => {
+      return validateAndFormatData({
+        data: await DraftItem.findById({ _id }).lean(),
+        userDto: ItemDraftDto,
+      });
+    }
+  );
 
   getAllDraftItem = warpAsync(
     async (
-      args: { page: number; limit: number },
+      queries: ItemFiltersType,
+      sort: ItemSortType,
       userId: string
-    ): Promise<responseHandler> => {
-      const count = await this.countDraftItems(userId);
-      return Pagination(DraftItem, ItemDraftDto, count.count ?? 0, args);
+    ): Promise<ServiceResponseType> => {
+      const filters = generateFilters<ItemFiltersType>(queries, "item");
+      const count = await this.countDraftItems(userId, filters, true);
+      return await generatePagination({
+        model: DraftItem,
+        userDto: ItemDraftDto,
+        totalCount: count.count,
+        paginationOptions: {
+          sort: generateSort<ItemSortType>(sort),
+          page: queries.page,
+          limit: queries.limit,
+        },
+        fieldSearch: { userId, ...filters },
+      });
+    }
+  );
+
+  countDraftItems = warpAsync(
+    async (
+      userId: string,
+      queries: ItemSortType,
+      filtered?: boolean
+    ): Promise<ServiceResponseType> => {
+      const filters = filtered
+        ? queries
+        : generateFilters<ItemSortType>(queries);
+      return serviceResponse({
+        count: await DraftItem.countDocuments({
+          userId,
+          ...filters,
+        }),
+      });
     }
   );
 
   updateDraftItem = warpAsync(
-    async (data: ItemDraftDtoType, query: object): Promise<responseHandler> => {
-      const parsed = validateAndFormatData(data, ItemDraftDto, "update");
-      if (!parsed.success) return parsed;
+    async (
+      data: ItemDraftDtoType,
+      _id: string
+    ): Promise<ServiceResponseType> => {
+      const validationResult = validateAndFormatData({
+        data,
+        userDto: ItemDraftDto,
+        actionType: "update",
+      });
+      if (!validationResult.success) return validationResult;
 
       let angles: number[] = [];
       let keys: string[] = [];
@@ -68,29 +117,28 @@ class DraftItemService {
         keysImageUnchanged = [],
         DraftItemImages = [],
         ...DraftItemData
-      } = parsed.data;
+      } = validationResult.data;
 
-      let updatedDraftItem;
+      let updatedDraftItem: any;
       if (DraftItemData || keysImageUnchanged > 0) {
         keysImageUnchanged?.map((image: any) => {
           keys.push(image.key);
           angles.push(image.angle);
         });
         [updatedDraftItem] = await Promise.all([
-          DraftItem.findOneAndUpdate(
-            query,
+          DraftItem.updateOne(
+            { _id },
             {
               $set: {
                 ...DraftItemData,
               },
-            },
-            { new: true }
+            }
           ),
           DraftItem.bulkWrite(
             keys.map((key, index) => ({
               updateOne: {
                 filter: {
-                  query,
+                  _id,
                   "itemImages.key": key,
                 },
                 update: {
@@ -112,12 +160,10 @@ class DraftItemService {
             },
           },
         };
-        updatedDraftItem = await DraftItem.findOneAndUpdate(query, newImage, {
-          new: true,
-        });
+        updatedDraftItem = await DraftItem.updateOne({ _id }, newImage);
       }
       return serviceResponse({
-        data: updatedDraftItem,
+        updatedCount: updatedDraftItem.modifiedCount,
       });
     }
   );
@@ -125,20 +171,19 @@ class DraftItemService {
   deleteImages = warpAsync(
     async (
       deleteImageKeys: string[],
-      DraftItemId: string,
-      userId: string
-    ): Promise<responseHandler> => {
+      _id: string
+    ): Promise<ServiceResponseType> => {
       if (deleteImageKeys?.length > 0) {
-        const query: any = DraftItemId
-          ? { _id: DraftItemId }
-          : { userId: userId };
-        await DraftItem.updateOne(query, {
-          $pull: {
-            DraftItemImages: {
-              key: { $in: deleteImageKeys },
+        await DraftItem.updateOne(
+          { _id },
+          {
+            $pull: {
+              DraftItemImages: {
+                key: { $in: deleteImageKeys },
+              },
             },
-          },
-        });
+          }
+        );
       }
       return serviceResponse({
         statusText: "OK",
@@ -147,18 +192,10 @@ class DraftItemService {
     }
   );
 
-  countDraftItems = warpAsync(
-    async (userId: string): Promise<responseHandler> => {
-      return serviceResponse({
-        count: await DraftItem.countDocuments({ userId }),
-      });
-    }
-  );
-
   deleteDraftItem = warpAsync(
-    async (query: object): Promise<responseHandler> => {
+    async (_id: object): Promise<ServiceResponseType> => {
       return serviceResponse({
-        deleteCount: (await DraftItem.deleteOne(query)).deletedCount,
+        deletedCount: (await DraftItem.deleteOne({ _id })).deletedCount,
       });
     }
   );

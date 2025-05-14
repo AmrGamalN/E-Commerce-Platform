@@ -8,6 +8,7 @@ const ItemCategoryDto = z.object({
   userName: z.string(),
   brand: z.string().optional(),
   type: z.string().optional(),
+  path: z.array(z.object({ id: z.string(), label: z.string() })).default([]),
 });
 
 const ItemDetailsDto = z.object({
@@ -48,7 +49,6 @@ const ItemDetailsDto = z.object({
   allowNegotiate: z.boolean().default(false),
   isFirstItem: z.boolean().default(true),
   promotion: z.boolean().default(false),
-  reviewId: z.array(z.string()).default([]),
   rate: z
     .object({
       avgRating: z.number(),

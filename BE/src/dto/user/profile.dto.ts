@@ -63,7 +63,10 @@ export const profileUpdateDto = profileDto
     profileImage: true,
     coverImage: true,
   })
-  .partial();
+  .partial()
+  .extend({
+    userId: z.string(),
+  });
 
 export type ProfileDtoType = z.infer<typeof profileDto>;
 export type ProfileAddDtoType = z.infer<typeof profileAddDto>;

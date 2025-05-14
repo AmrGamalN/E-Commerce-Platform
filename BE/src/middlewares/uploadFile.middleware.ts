@@ -2,7 +2,7 @@ import multer, { MulterError } from "multer";
 import { NextFunction, Request, Response } from "express";
 import multerS3 from "multer-s3";
 import { DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
-import { asyncHandler } from "./handleError";
+import { asyncHandler } from "./handleError.middleware";
 import { v4 as uuidv4 } from "uuid";
 import { bucketName, s3 } from "../config/client-s3";
 

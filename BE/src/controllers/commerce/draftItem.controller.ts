@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import DraftItemService from "../../services/commerce/draftItem.service";
-import { controllerResponse } from "../../utils/responseHandler";
+import { controllerResponse } from "../../utils/response.util";
 
 class DraftItemController {
   private static Instance: DraftItemController;
@@ -26,15 +26,18 @@ class DraftItemController {
 
   async getDraftItem(req: Request, res: Response): Promise<Response> {
     const retrievedDraftItem = await this.serviceInstance.getDraftItem(
-      req.body.id
+      req.params.id
     );
     return controllerResponse(res, retrievedDraftItem);
   }
 
   async getAllDraftItem(req: Request, res: Response): Promise<Response> {
+    const { price, createdAt, ...filters } = req.query;
+    const sort = { price, createdAt };
     const retrievedDraftItem = await this.serviceInstance.getAllDraftItem(
-      req.query,
-      req.curUser.userId
+      filters,
+      sort,
+      req.curUser?.userId
     );
     return controllerResponse(res, retrievedDraftItem);
   }
@@ -42,21 +45,30 @@ class DraftItemController {
   async updateDraftItem(req: Request, res: Response): Promise<Response> {
     const retrievedDraftItem = await this.serviceInstance.updateDraftItem(
       req.body,
-      req.body.id
+      req.params.id
     );
     return controllerResponse(res, retrievedDraftItem);
   }
 
   async countDraftItems(req: Request, res: Response): Promise<Response> {
     const count = await this.serviceInstance.countDraftItems(
-      req.curUser.userId
+      req.curUser?.userId,
+      req.query
     );
     return controllerResponse(res, count);
   }
 
+  async deleteDraftItemImages(req: Request, res: Response): Promise<Response> {
+    const deleteImage = await this.serviceInstance.deleteImages(
+      req.body.deleteImageKeys,
+      req.params.id
+    );
+    return controllerResponse(res, deleteImage);
+  }
+
   async deleteDraftItem(req: Request, res: Response): Promise<Response> {
     const retrievedDraftItem = await this.serviceInstance.deleteDraftItem(
-      req.body.id
+      req.params.id
     );
     return controllerResponse(res, retrievedDraftItem);
   }

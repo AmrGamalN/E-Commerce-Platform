@@ -8,5 +8,5 @@ const otpSchema: Schema = new Schema({
   expiresAt: { type: Date, required: true, index: { expires: 0 } },
 });
 
-const Otp = model<OtpDtoType>("otps", otpSchema);
+const Otp = model<OtpDtoType>("user_otps", otpSchema);
 export default Otp;

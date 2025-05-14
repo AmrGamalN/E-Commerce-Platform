@@ -1,8 +1,8 @@
 import express from "express";
 import LoginController from "../../controllers/auth/login.controller";
-import { asyncHandler } from "../../middlewares/handleError";
-import TokenMiddleware from "../../middlewares/token.middleware";
-import { expressValidator } from "../../middlewares/validatorMiddleware";
+import { asyncHandler } from "../../middlewares/handleError.middleware";
+import TokenMiddleware from "../../middlewares/authentication.middleware";
+import { expressValidator } from "../../middlewares/validator.middleware";
 import {
   validateLoginByEmail,
   validateLoginByPhone,
@@ -28,7 +28,7 @@ const router = express.Router();
  *               $ref: '#/components/schemas/LoginEmailDto'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/LoginResponse'
+ *         $ref: '#/components/schemas/LoginResponse'
  *       404:
  *         description: User not found
  *       500:
@@ -55,7 +55,7 @@ router.post(
  *               $ref: '#/components/schemas/LoginPhoneDto'
  *     responses:
  *       200:
- *         $ref: '#/components/responses/LoginResponse'
+ *         $ref: '#/components/schemas/LoginResponse'
  *       404:
  *         description: User not found
  *       500:
@@ -89,7 +89,7 @@ router.post(
  *                 pattern: "^[0-9]{6}$"
  *     responses:
  *       200:
- *         $ref: '#/components/responses/LoginResponse'
+ *         $ref: '#/components/schemas/LoginResponse'
  *       404:
  *         description: User not found
  *       400:
@@ -99,7 +99,7 @@ router.post(
  */
 router.post(
   "/2fa",
-  asyncHandler(tokenMiddleware.authorizationMiddleware(role)),
+  tokenMiddleware.authorizationMiddleware(role),
   asyncHandler(expressValidator(validateCode2AF)),
   asyncHandler(controller.verifyTwoFactorAuthentication.bind(controller))
 );
@@ -122,7 +122,7 @@ router.post(
  *                 description: "idToken"
  *     responses:
  *       200:
- *         $ref: '#/components/responses/LoginResponse'
+ *         $ref: '#/components/schemas/LoginResponse'
  *       404:
  *         description: User not found
  *       400:
@@ -154,7 +154,7 @@ router.post(
  *                 description: "idToken"
  *     responses:
  *       200:
- *         $ref: '#/components/responses/LoginResponse'
+ *         $ref: '#/components/schemas/LoginResponse'
  *       404:
  *         description: User not found
  *       400:

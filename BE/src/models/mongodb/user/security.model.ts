@@ -32,5 +32,5 @@ const userSecuritySchema = new Schema(
   { timestamps: true }
 );
 
-const Security = model<UserSecurityDtoType>("Securities", userSecuritySchema);
+const Security = model<UserSecurityDtoType>("user_securities", userSecuritySchema);
 export default Security;
